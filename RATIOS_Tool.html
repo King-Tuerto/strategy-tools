@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Ratio Analysis Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens ──────────────────────────────── */
+:root {
+  --navy:   #0f2342;
+  --cobalt: #1a3a6e;
+  --sky:    #2563eb;
+  --steel:  #64748b;
+  --cloud:  #f1f5f9;
+  --white:  #ffffff;
+  --accent: #f59e0b;
+  --green:  #10b981;
+  --red:    #ef4444;
+  --orange: #f97316;
+  --text:   #1e293b;
+  --muted:  #94a3b8;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow:    0 4px 24px rgba(15,35,66,0.10);
+  --shadow-lg: 0 12px 48px rgba(15,35,66,0.16);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif; color: var(--text);
+  background: var(--navy);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(37,99,235,0.25) 0%, transparent 60%),
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px);
+  min-height: 100vh; line-height: 1.7;
+}
+.app-shell { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; }
+
+/* ── App Header ─────────────────────────────────── */
+.app-header { text-align: center; margin-bottom: 48px; }
+.app-header .eyebrow {
+  display: inline-block; background: rgba(37,99,235,0.25); color: #93c5fd;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(147,197,253,0.25); margin-bottom: 20px;
+}
+.app-header h1 { font-family: 'DM Serif Display', serif; font-size: clamp(2.2rem,5vw,3.4rem); color: var(--white); line-height: 1.1; margin-bottom: 14px; }
+.app-header h1 em { font-style: italic; color: #93c5fd; }
+.app-header p { color: #94a3b8; font-size: 1.05rem; max-width: 520px; margin: 0 auto; line-height: 1.7; font-weight: 300; }
+
+/* ── Progress Bar ───────────────────────────────── */
+.progress-bar-wrap { display: flex; align-items: center; margin-bottom: 40px; position: relative; }
+.progress-bar-wrap::before { content:''; position: absolute; top: 18px; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.08); z-index: 0; }
+.progress-bar-fill { position: absolute; top: 18px; left: 0; height: 2px; background: var(--sky); z-index: 1; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+.step-node { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative; z-index: 2; }
+.step-node .bubble { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: var(--muted); transition: all 0.3s ease; }
+.step-node.active .bubble { background: var(--sky); border-color: var(--sky); color: white; box-shadow: 0 0 0 4px rgba(37,99,235,0.25); }
+.step-node.done .bubble { background: var(--green); border-color: var(--green); color: white; }
+.step-node .step-label { font-size: 0.7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; transition: color 0.3s; }
+.step-node.active .step-label { color: #93c5fd; }
+.step-node.done .step-label { color: var(--green); }
+
+/* ── Card ───────────────────────────────────────── */
+.card { background: var(--white); border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; animation: slideUp 0.4s cubic-bezier(0.4,0,0.2,1); margin-bottom: 28px; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.card-header { background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%); padding: 28px 36px; display: flex; align-items: center; gap: 16px; }
+.card-header h2 { font-family: 'DM Serif Display', serif; color: white; font-size: 1.5rem; }
+.card-header p { color: #94a3b8; font-size: 0.85rem; margin-top: 4px; font-weight: 300; }
+.card-header .icon { width: 48px; height: 48px; background: rgba(255,255,255,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+.card-body { padding: 36px; }
+.step { display: none; } .step.active { display: block; }
+
+/* ── Form ───────────────────────────────────────── */
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--steel); margin-bottom: 8px; }
+input[type="text"], input[type="number"], textarea { width: 100%; padding: 13px 16px; border: 2px solid var(--border); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 1rem; color: var(--text); background: var(--cloud); transition: border-color 0.2s, box-shadow 0.2s; outline: none; }
+input:focus, textarea:focus { border-color: var(--sky); box-shadow: 0 0 0 4px rgba(37,99,235,0.12); background: white; }
+input.error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(239,68,68,0.12); }
+.error-msg { font-size: 0.8rem; color: var(--red); margin-top: 5px; font-weight: 500; display: none; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* ── Buttons ────────────────────────────────────── */
+.btn { padding: 13px 28px; border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 700; cursor: pointer; border: 2px solid transparent; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 8px; }
+.btn-primary { background: var(--sky); color: white; box-shadow: 0 4px 16px rgba(37,99,235,0.30); }
+.btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(37,99,235,0.35); }
+.btn-secondary { background: transparent; color: var(--steel); border-color: var(--border); }
+.btn-secondary:hover { background: var(--cloud); color: var(--text); }
+.btn-accent { background: var(--accent); color: white; box-shadow: 0 4px 16px rgba(245,158,11,0.30); }
+.btn-accent:hover { background: #d97706; transform: translateY(-1px); }
+.btn-row { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; margin-top: 28px; }
+.hint-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 20px; margin-bottom: 28px; font-size: 0.85rem; color: #1e40af; line-height: 1.7; }
+.add-btn { display: inline-flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 700; color: var(--sky); background: rgba(37,99,235,0.08); border: 1.5px dashed rgba(37,99,235,0.3); border-radius: 8px; padding: 6px 12px; cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+.add-btn:hover { background: rgba(37,99,235,0.15); border-color: var(--sky); }
+
+/* ── Financial Entry Tables ─────────────────────── */
+.section-title { font-family: 'DM Serif Display', serif; font-size: 1.2rem; color: var(--text); margin: 8px 0 4px; display: flex; align-items: center; gap: 10px; }
+.section-title .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.section-sub { font-size: 0.82rem; color: var(--steel); margin-bottom: 14px; }
+.fin-table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+.fin-table th { font-size: 0.68rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; text-align: center; padding: 6px 4px; border-bottom: 1px solid var(--border); }
+.fin-table th:first-child { text-align: left; }
+.fin-table td { padding: 4px; vertical-align: middle; font-size: 0.86rem; }
+.fin-table td:first-child { padding-left: 0; }
+.fin-table .lbl { color: var(--text); }
+.fin-table .lbl small { display: block; color: var(--muted); font-size: 0.72rem; line-height: 1.3; }
+.fin-table input[type="number"] { padding: 8px 10px; font-size: 0.86rem; text-align: right; border-width: 1.5px; border-radius: 8px; min-width: 90px; }
+.fin-table .group-row td { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--steel); padding-top: 14px; border-bottom: 1px solid var(--border); }
+.fin-table .calc-row td { font-weight: 700; background: var(--cloud); }
+.fin-table .calc-row td.num { text-align: right; padding-right: 14px; }
+.fin-table td.ref { text-align: right; color: var(--steel); font-size: 0.8rem; padding-right: 12px; white-space: nowrap; }
+.fin-table .check-ok { color: #047857; }
+.fin-table .check-bad { color: #dc2626; }
+.toggle-row { display: flex; align-items: center; gap: 10px; padding: 16px 18px; background: var(--cloud); border-radius: 12px; margin-bottom: 20px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+.toggle-row input { width: 18px; height: 18px; accent-color: var(--sky); }
+.unit-note { font-size: 0.78rem; color: var(--steel); margin-bottom: 18px; }
+
+/* ── Results ────────────────────────────────────── */
+.score-summary { background: white; border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px; }
+.summary-topbar { background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%); padding: 20px 28px; display: flex; align-items: center; gap: 12px; }
+.summary-topbar h3 { font-family: 'DM Serif Display', serif; color: white; font-size: 1.15rem; }
+.summary-topbar .chart-icon { width: 40px; height: 40px; background: rgba(255,255,255,0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+.summary-topbar .quadrant-badge { padding: 6px 16px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-left: auto; }
+.table-scroll { overflow-x: auto; }
+.score-table { width: 100%; border-collapse: collapse; }
+.score-table th { background: var(--cloud); padding: 10px 12px; text-align: right; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--steel); border-bottom: 2px solid var(--border); white-space: nowrap; }
+.score-table th:first-child { text-align: left; }
+.score-table th.proj, .score-table td.proj { background: #f8fafc; }
+.score-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 0.85rem; text-align: right; white-space: nowrap; }
+.score-table td:first-child { text-align: left; white-space: normal; }
+.score-table .cat-row td { text-align: left; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 10px 12px; background: white; }
+.score-table tr:last-child td { border-bottom: none; }
+.score-chip { display: inline-flex; align-items: center; justify-content: center; padding: 2px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; }
+.trend { font-size: 0.78rem; font-weight: 700; }
+.trend.up { color: #047857; } .trend.down { color: #dc2626; } .trend.flat { color: var(--steel); }
+.table-note { padding: 14px 20px; font-size: 0.78rem; color: var(--steel); border-top: 1px solid var(--border); }
+
+/* ── Trend Cards ────────────────────────────────── */
+.chart-wrap { background: white; border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; margin-bottom: 28px; }
+.chart-body { padding: 24px; }
+.spark-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.spark-card { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px 8px; break-inside: avoid; }
+.spark-card .sp-name { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--steel); line-height: 1.3; min-height: 2.2em; }
+.spark-card .sp-val { font-family: 'DM Serif Display', serif; font-size: 1.35rem; color: var(--text); line-height: 1.2; }
+.spark-card .sp-year { font-size: 0.7rem; color: var(--muted); }
+.spark-card svg { display: block; width: 100%; height: 56px; margin-top: 4px; }
+.spark-legend { display: flex; gap: 18px; justify-content: center; font-size: 0.75rem; color: var(--steel); margin-top: 16px; flex-wrap: wrap; }
+.spark-legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ── Strategy Card ─────────────────────────────── */
+.strategy-card { background: white; border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px; }
+.strategy-header { padding: 24px 28px 20px; border-bottom: 2px solid var(--border); display: flex; align-items: flex-start; gap: 16px; }
+.strategy-header .icon-big { font-size: 2rem; line-height: 1; }
+.strategy-header h3 { font-family: 'DM Serif Display', serif; font-size: 1.3rem; color: var(--text); margin-bottom: 4px; }
+.strategy-header p { color: var(--steel); font-size: 0.88rem; line-height: 1.6; }
+.strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.strategy-item { padding: 20px 24px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); transition: background 0.15s; }
+.strategy-item:hover { background: var(--cloud); }
+.strategy-item:nth-child(even) { border-right: none; }
+.strategy-item:nth-last-child(-n+2) { border-bottom: none; }
+.strategy-item h4 { font-size: 0.88rem; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.strategy-item p { font-size: 0.82rem; color: var(--steel); line-height: 1.6; }
+
+/* ── Validation Alert ───────────────────────────── */
+.validation-alert { display: none; background: #fef2f2; border: 2px solid #dc2626; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; color: #991b1b; font-size: 0.88rem; line-height: 1.6; }
+.validation-alert strong { display: block; font-size: 0.95rem; margin-bottom: 4px; }
+
+/* ── References ─────────────────────────────────── */
+.references-card { background: white; border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px; }
+.references-card .ref-header { padding: 18px 28px; border-bottom: 1px solid var(--border); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--steel); }
+.references-card .ref-body { padding: 18px 28px; font-size: 0.8rem; color: var(--steel); line-height: 1.8; }
+.references-card .ref-body p { margin-bottom: 6px; }
+.references-card .ref-body p:last-child { margin-bottom: 0; }
+
+/* ── Print ──────────────────────────────────────── */
+.print-only { display: none; }
+@media print {
+  body { background: white !important; color: black; }
+  @page { margin: 1.2cm; }
+  .app-header, .progress-bar-wrap, .no-print, #step1, #step2 { display: none !important; }
+  .print-only { display: block !important; }
+  #step3 { display: block !important; }
+  .card, .chart-wrap, .score-summary, .strategy-card, .references-card { box-shadow: none !important; border: 1px solid #ddd; }
+  .summary-topbar, .card-header { background: #1a3a6e !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .score-chip, .validation-alert, .score-table th.proj, .score-table td.proj { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .app-shell { padding: 0; max-width: 100%; }
+  .score-table td, .score-table th { padding: 6px 8px; font-size: 0.75rem; }
+  .spark-grid { grid-template-columns: repeat(4, 1fr); }
+  .strategy-item, .score-summary, .references-card { break-inside: avoid; }
+  .strategy-grid { grid-template-columns: 1fr 1fr; }
+  .print-header { text-align: center; padding: 20px 0 30px; border-bottom: 3px solid #1a3a6e; margin-bottom: 24px; }
+  .print-header h1 { font-size: 1.8rem; color: #1a3a6e; font-family: 'DM Serif Display', serif; }
+  .print-header p { color: #666; font-size: 0.9rem; margin-top: 6px; }
+}
+@media (max-width: 620px) {
+  .strategy-grid { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .card-body { padding: 22px; }
+  .fin-table input[type="number"] { min-width: 72px; }
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <div class="app-header no-print">
+    <div class="eyebrow">Strategic Management Tool</div>
+    <h1>Financial Ratio <em>Analysis</em></h1>
+    <p>Enter two years of financial statements and three years of projections to calculate and compare fourteen key financial ratios.</p>
+  </div>
+
+  <div class="progress-bar-wrap no-print" id="progressBar">
+    <div class="progress-bar-fill" id="progressFill" style="width:16%"></div>
+    <div class="step-node active" id="node1"><div class="bubble">1</div><span class="step-label">Company</span></div>
+    <div class="step-node" id="node2"><div class="bubble">2</div><span class="step-label">Financials</span></div>
+    <div class="step-node" id="node3"><div class="bubble">3</div><span class="step-label">Results</span></div>
+  </div>
+
+  <!-- ═══════════ STEP 1 ═══════════ -->
+  <div class="step active" id="step1">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">🏢</div>
+        <div><h2>Company Information</h2><p>Identify the organization being analyzed</p></div>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="companyName">Company Name *</label>
+          <input type="text" id="companyName" placeholder="e.g. Apple Inc." aria-label="Company Name">
+          <div class="error-msg" id="err-company">Please enter a company name to continue.</div>
+        </div>
+        <div class="form-group">
+          <label for="companyIndustry">Industry / Sector</label>
+          <input type="text" id="companyIndustry" placeholder="e.g. Consumer Electronics" aria-label="Industry or Sector">
+        </div>
+        <div class="form-group">
+          <label for="analystName">Analyst Name</label>
+          <input type="text" id="analystName" placeholder="e.g. Jane Smith" aria-label="Analyst Name">
+        </div>
+        <div class="form-group">
+          <label for="analysisDate">Date</label>
+          <input type="text" id="analysisDate" placeholder="" aria-label="Analysis Date">
+        </div>
+
+        <div class="hint-box">
+          <strong>How financial ratio analysis works:</strong><br>
+          Ratios turn raw financial statements into comparable measures of performance. This tool calculates fourteen ratios in four groups:<br>
+          &bull; <strong>Liquidity</strong> &mdash; can the firm pay its short-term bills? (current, quick)<br>
+          &bull; <strong>Leverage</strong> &mdash; how much of the firm is financed by debt? (debt-to-assets, long-term debt-to-equity, times interest earned)<br>
+          &bull; <strong>Activity</strong> &mdash; how efficiently does the firm use its assets? (inventory, fixed asset, total asset, and receivables turnover; collection period)<br>
+          &bull; <strong>Profitability</strong> &mdash; how much does the firm earn? (gross margin, operating margin, ROA, ROE)<br><br>
+          You will enter the two most recent years of financial data, then (optionally) your assumptions for three projected years. The projected ratios show whether your recommended strategy is financially realistic.
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnToStep2">Continue to Financials &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 2 ═══════════ -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">📊</div>
+        <div><h2>Financial Statements</h2><p>Enter historical data and projection assumptions</p></div>
+      </div>
+      <div class="card-body">
+        <div class="hint-box">
+          <strong>📘 How to use this tool:</strong><br>
+          &bull; Enter the <strong>oldest year in the first column</strong> and the newest year in the second.<br>
+          &bull; Use one unit throughout (for example, all figures in millions). Do not type commas or dollar signs.<br>
+          &bull; Enter interest income, tax credits, and treasury stock as <strong>negative</strong> numbers.<br>
+          &bull; Shaded rows calculate automatically. The balance check must show that assets equal liabilities plus equity.<br>
+          &bull; Sources: the company&rsquo;s 10-K (Form 10-K annual report), or a financial site such as Yahoo Finance or Morningstar.
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="yearOld">Oldest Year</label>
+            <input type="number" id="yearOld" aria-label="Oldest historical year">
+          </div>
+          <div class="form-group">
+            <label for="yearNew">Newest Year</label>
+            <input type="number" id="yearNew" aria-label="Newest historical year">
+          </div>
+        </div>
+        <div class="unit-note no-print">
+          <button class="add-btn" type="button" onclick="loadExample()">Fill with fictional example data</button>
+          &nbsp; Use the example to see how the tool works, then replace it with your company&rsquo;s numbers.
+        </div>
+
+        <div class="section-title"><span class="dot" style="background:#2563eb"></span>Income Statement</div>
+        <div class="section-sub">Historical figures for the two most recent fiscal years.</div>
+        <div class="table-scroll"><table class="fin-table" id="isTable"></table></div>
+
+        <div class="section-title"><span class="dot" style="background:#16a34a"></span>Balance Sheet</div>
+        <div class="section-sub">Year-end balances for the same two years.</div>
+        <div class="table-scroll"><table class="fin-table" id="bsTable"></table></div>
+
+        <label class="toggle-row" for="useProj">
+          <input type="checkbox" id="useProj" checked aria-label="Include projected ratios">
+          Include three years of projected statements and ratios
+        </label>
+
+        <div id="projSection">
+          <div class="hint-box">
+            <strong>📘 Building the projections:</strong><br>
+            &bull; Work in this order: income statement first, then the balance sheet <strong>from the bottom up</strong> &mdash; dividends and equity, then liabilities, then assets.<br>
+            &bull; Percent rows are entered as percents (type 5 for 5%). Dollar rows marked <strong>net new</strong> are the change for that year only; the tool adds it to the prior year.<br>
+            &bull; The &ldquo;Newest year&rdquo; column shows the historical figure for reference. Do not blindly copy it; adjust it to reflect your recommended strategy.<br>
+            &bull; <strong>Cash is the plug figure.</strong> It is calculated so the balance sheet balances. If projected cash is negative or unrealistically high, revisit your assumptions.
+          </div>
+          <div class="unit-note no-print">
+            <button class="add-btn" type="button" onclick="prefillProjections()">Prefill projections with newest-year values</button>
+            &nbsp; A starting point only; change the numbers to match your strategy.
+          </div>
+          <div class="form-group">
+            <label>Projected Year Labels</label>
+            <div class="section-sub" id="projYearNote" style="margin-bottom:0"></div>
+          </div>
+          <div class="table-scroll"><table class="fin-table" id="projTable"></table></div>
+        </div>
+
+        <div id="form-error" style="display:none; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:20px; color:#dc2626; font-size:0.85rem; font-weight:500;"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="goToStep1()">&larr; Back</button>
+          <button class="btn btn-primary" onclick="generateResults()">Generate Results &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 3 ═══════════ -->
+  <div class="step" id="step3">
+    <div class="print-only print-header">
+      <h1 id="print-title">Financial Ratio Analysis</h1>
+      <p id="print-meta"></p>
+    </div>
+
+    <div class="validation-alert" id="validationAlert"></div>
+
+    <!-- Ratio Table -->
+    <div class="score-summary">
+      <div class="summary-topbar">
+        <div class="chart-icon">📋</div>
+        <h3>Financial Ratios</h3>
+        <span class="quadrant-badge" id="overallBadge"></span>
+      </div>
+      <div class="table-scroll">
+        <table class="score-table" id="ratioTable"></table>
+      </div>
+      <div class="table-note">Ratings use general rules of thumb. Acceptable ranges differ by industry, so compare these ratios with competitors and industry averages before drawing conclusions. NA means the ratio cannot be calculated (for example, no inventory or no interest expense).</div>
+    </div>
+
+    <!-- Trend Cards -->
+    <div class="chart-wrap">
+      <div class="summary-topbar">
+        <div class="chart-icon">📈</div>
+        <h3>Ratio Trends</h3>
+      </div>
+      <div class="chart-body">
+        <div class="spark-grid" id="sparkGrid"></div>
+        <div class="spark-legend" id="sparkLegend"></div>
+      </div>
+    </div>
+
+    <!-- Projected Statements -->
+    <div class="score-summary" id="projSummaryWrap">
+      <div class="summary-topbar">
+        <div class="chart-icon">🔮</div>
+        <h3>Projected Financial Statements</h3>
+      </div>
+      <div class="table-scroll">
+        <table class="score-table" id="projSummary"></table>
+      </div>
+    </div>
+
+    <!-- Strategy Card -->
+    <div class="strategy-card" id="strategyCard"></div>
+
+    <div class="references-card">
+      <div class="ref-header">References</div>
+      <div class="ref-body">
+        <p>David, F. R., &amp; David, F. R. (2017). <em>Strategic management: A competitive advantage approach, concepts and cases</em> (16th ed.). Pearson.</p>
+        <p><em>Note:</em> Ratio formulas and the projected financial statement method follow the David and David approach to financial analysis and projected statements. Rating thresholds are general rules of thumb provided for educational purposes and are not industry benchmarks.</p>
+      </div>
+    </div>
+
+    <div class="btn-row no-print">
+      <button class="btn btn-secondary" onclick="goToStep2()">&larr; Edit Financials</button>
+      <button class="btn btn-secondary" onclick="resetAll()">↺ Start Over</button>
+      <button class="btn btn-accent" onclick="window.print()">🖨️ Print / Save PDF</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   Financial Ratio Analysis Tool — JavaScript
+   Formulas mirror the Ratios, Financial Statements and
+   Projected Statements tabs of the course Excel template.
+   ═══════════════════════════════════════════════════════ */
+
+let results = {};
+
+/* ── Line items ─────────────────────────────────── */
+// Historical income statement inputs
+const IS_ITEMS = [
+  { key: 'rev',  label: 'Revenue (Sales)' },
+  { key: 'cogs', label: 'Cost of Goods Sold' },
+  { calc: 'gp',  label: 'Gross Profit' },
+  { key: 'opex', label: 'Operating Expenses' },
+  { calc: 'ebit', label: 'EBIT (Operating Income)' },
+  { key: 'int',  label: 'Interest Expense', note: 'Interest income: enter as negative' },
+  { key: 'nre',  label: 'Non-Recurring Events', note: 'e.g. discontinued operations; losses negative' },
+  { calc: 'ebt', label: 'EBT (Pretax Income)' },
+  { key: 'tax',  label: 'Tax', note: 'Tax credit: enter as negative' },
+  { calc: 'ni',  label: 'Net Income' }
+];
+
+// Historical balance sheet inputs
+const BS_ITEMS = [
+  { group: 'Assets' },
+  { key: 'cash',   label: 'Cash and Short-Term Investments' },
+  { key: 'ar',     label: 'Accounts Receivable' },
+  { key: 'inv',    label: 'Inventory' },
+  { key: 'oca',    label: 'Other Current Assets' },
+  { calc: 'tca',   label: 'Total Current Assets' },
+  { key: 'ppe',    label: 'Property, Plant & Equipment (net)' },
+  { key: 'gw',     label: 'Goodwill' },
+  { key: 'intang', label: 'Intangibles' },
+  { key: 'olta',   label: 'Other Long-Term Assets' },
+  { calc: 'ta',    label: 'Total Assets' },
+  { group: 'Liabilities' },
+  { key: 'ap',     label: 'Accounts Payable' },
+  { key: 'ocl',    label: 'Other Current Liabilities' },
+  { calc: 'tcl',   label: 'Total Current Liabilities' },
+  { key: 'ltd',    label: 'Long-Term Debt' },
+  { key: 'oltl',   label: 'Other Long-Term Liabilities' },
+  { calc: 'tl',    label: 'Total Liabilities' },
+  { group: 'Equity' },
+  { key: 'cs',     label: 'Common Stock' },
+  { key: 're',     label: 'Retained Earnings' },
+  { key: 'ts',     label: 'Treasury Stock', note: 'Enter as negative' },
+  { key: 'pic',    label: 'Paid-in Capital & Other' },
+  { calc: 'te',    label: 'Total Equity' },
+  { calc: 'tle',   label: 'Total Liabilities and Equity' },
+  { calc: 'check', label: 'Balance Check (Assets − L&E)' }
+];
+
+// Projection assumptions, in the order the textbook recommends working.
+// type 'pct' = percent entered as a whole number; 'usd' = dollar amount.
+// ref(h) gives the newest-year historical value shown for reference / prefill.
+const PROJ_ITEMS = [
+  { group: 'Income Statement' },
+  { key: 'g',     type: 'pct', label: 'Revenue Growth',            note: '% change from prior year',       ref: h => div(h.rev - hOld().rev, hOld().rev) },
+  { key: 'cogsP', type: 'pct', label: 'Cost of Goods Sold',        note: '% of revenue',                   ref: h => div(h.cogs, h.rev) },
+  { key: 'opexP', type: 'pct', label: 'Operating Expenses',        note: '% of revenue',                   ref: h => div(h.opex, h.rev) },
+  { key: 'dInt',  type: 'usd', label: 'Interest Expense',          note: 'net new $ (change vs prior year)', ref: h => h.int, refLabel: 'paid', prefill: 0 },
+  { key: 'nre',   type: 'usd', label: 'Non-Recurring Events',      note: '$ for that year (usually 0)',    ref: h => h.nre, prefill: 0 },
+  { key: 'taxP',  type: 'pct', label: 'Tax Rate',                  note: '% of pretax income',             ref: h => div(h.tax, h.ebt) },
+  { group: 'Balance Sheet — Equity (start here)' },
+  { key: 'divs',  type: 'usd', label: 'Total Dividends to Pay',    note: '$ paid that year (not cumulative)', ref: () => null, prefill: 0 },
+  { key: 'dCs',   type: 'usd', label: 'Common Stock',              note: 'net new $',                      ref: h => h.cs, prefill: 0 },
+  { key: 'dTs',   type: 'usd', label: 'Treasury Stock',            note: 'net new $ (buybacks negative)',  ref: h => h.ts, prefill: 0 },
+  { key: 'dPic',  type: 'usd', label: 'Paid-in Capital & Other',   note: 'net new $',                      ref: h => h.pic, prefill: 0 },
+  { group: 'Balance Sheet — Liabilities' },
+  { key: 'dLtd',  type: 'usd', label: 'Long-Term Debt',            note: 'net new $ (repayment negative)', ref: h => h.ltd, prefill: 0 },
+  { key: 'oltlP', type: 'pct', label: 'Other Long-Term Liabilities', note: '% of revenue',                 ref: h => div(h.oltl, h.rev) },
+  { key: 'apP',   type: 'pct', label: 'Accounts Payable',          note: '% of revenue',                   ref: h => div(h.ap, h.rev) },
+  { key: 'oclP',  type: 'pct', label: 'Other Current Liabilities', note: '% of revenue',                   ref: h => div(h.ocl, h.rev) },
+  { group: 'Balance Sheet — Assets' },
+  { key: 'dPpe',  type: 'usd', label: 'Property, Plant & Equipment', note: 'net new $',                    ref: h => h.ppe, prefill: 0 },
+  { key: 'dGw',   type: 'usd', label: 'Goodwill',                  note: 'net new $',                      ref: h => h.gw, prefill: 0 },
+  { key: 'dInt2', type: 'usd', label: 'Intangibles',               note: 'net new $',                      ref: h => h.intang, prefill: 0 },
+  { key: 'oltaP', type: 'pct', label: 'Other Long-Term Assets',    note: '% of revenue',                   ref: h => div(h.olta, h.rev) },
+  { key: 'arP',   type: 'pct', label: 'Accounts Receivable',       note: '% of revenue',                   ref: h => div(h.ar, h.rev) },
+  { key: 'invP',  type: 'pct', label: 'Inventory',                 note: '% of revenue',                   ref: h => div(h.inv, h.rev) },
+  { key: 'ocaP',  type: 'pct', label: 'Other Current Assets',      note: '% of revenue',                   ref: h => div(h.oca, h.rev) },
+  { calc: 'cashPlug', label: 'Cash and Equivalents (plug)' }
+];
+
+/* ── Ratio definitions ──────────────────────────── */
+// fmt: 'x' = times, 'pct' = percent, 'days'. hib = higher is better.
+// rate(v) returns 2 strong / 1 adequate / 0 weak, or null = judge by trend only.
+const CATS = {
+  liq:  { name: 'Liquidity',     color: '#2563eb' },
+  lev:  { name: 'Leverage',      color: '#ea580c' },
+  act:  { name: 'Activity',      color: '#0891b2' },
+  prof: { name: 'Profitability', color: '#16a34a' }
+};
+const RATIOS = [
+  { id: 'cur',   cat: 'liq',  name: 'Current Ratio',                      fmt: 'x',    hib: true,  f: s => div(s.tca, s.tcl),                 rate: v => v >= 1.5 ? 2 : v >= 1.0 ? 1 : 0 },
+  { id: 'quick', cat: 'liq',  name: 'Quick Ratio',                        fmt: 'x',    hib: true,  f: s => div(s.tca - s.inv, s.tcl),         rate: v => v >= 1.0 ? 2 : v >= 0.7 ? 1 : 0 },
+  { id: 'dta',   cat: 'lev',  name: 'Total Liabilities-to-Total-Assets',  fmt: 'x',    hib: false, f: s => div(s.tl, s.ta),                   rate: v => v <= 0.5 ? 2 : v <= 0.7 ? 1 : 0 },
+  { id: 'lde',   cat: 'lev',  name: 'Long-Term Debt-to-Equity',           fmt: 'x',    hib: false, f: s => s.te <= 0 ? null : div(s.ltd, s.te), rate: v => v <= 0.5 ? 2 : v <= 1.0 ? 1 : 0 },
+  { id: 'tie',   cat: 'lev',  name: 'Times-Interest-Earned',              fmt: 'x',    hib: true,  f: s => s.int > 0 ? div(s.ebit, s.int) : null, rate: v => v >= 5 ? 2 : v >= 2 ? 1 : 0 },
+  { id: 'invT',  cat: 'act',  name: 'Inventory Turnover',                 fmt: 'x',    hib: true,  f: s => s.inv > 0 ? div(s.cogs, s.inv) : null, rate: null },
+  { id: 'faT',   cat: 'act',  name: 'Fixed Assets Turnover',              fmt: 'x',    hib: true,  f: s => div(s.rev, s.ppe),                 rate: null },
+  { id: 'taT',   cat: 'act',  name: 'Total Assets Turnover',              fmt: 'x',    hib: true,  f: s => div(s.rev, s.ta),                  rate: null },
+  { id: 'arT',   cat: 'act',  name: 'Accounts Receivable Turnover',       fmt: 'x',    hib: true,  f: s => s.ar > 0 ? div(s.rev, s.ar) : null, rate: null },
+  { id: 'acp',   cat: 'act',  name: 'Average Collection Period',          fmt: 'days', hib: false, f: s => s.ar > 0 ? div(s.ar, s.rev / 365) : null, rate: null },
+  { id: 'gpm',   cat: 'prof', name: 'Gross Profit Margin',                fmt: 'pct',  hib: true,  f: s => div(s.rev - s.cogs, s.rev),       rate: v => v >= 0.40 ? 2 : v >= 0.20 ? 1 : 0 },
+  { id: 'opm',   cat: 'prof', name: 'Operating Profit Margin',            fmt: 'pct',  hib: true,  f: s => div(s.ebit, s.rev),                rate: v => v >= 0.15 ? 2 : v >= 0.05 ? 1 : 0 },
+  { id: 'roa',   cat: 'prof', name: 'Return on Assets (ROA)',             fmt: 'pct',  hib: true,  f: s => div(s.ni, s.ta),                   rate: v => v >= 0.05 ? 2 : v >= 0 ? 1 : 0 },
+  { id: 'roe',   cat: 'prof', name: 'Return on Equity (ROE)',             fmt: 'pct',  hib: true,  f: s => s.te <= 0 ? null : div(s.ni, s.te), rate: v => v >= 0.15 ? 2 : v >= 0 ? 1 : 0 }
+];
+const RATING = [
+  { text: 'Weak',     bg: '#fee2e2', color: '#b91c1c' },
+  { text: 'Adequate', bg: '#fef3c7', color: '#b45309' },
+  { text: 'Strong',   bg: '#d1fae5', color: '#047857' }
+];
+
+/* ── Helpers ────────────────────────────────────── */
+function div(a, b) { return (b === 0 || !isFinite(a) || !isFinite(b)) ? null : a / b; }
+function num(id) { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? 0 : v; }
+function hasVal(id) { const el = document.getElementById(id); return el && el.value.trim() !== ''; }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function money(v) { if (v === null || !isFinite(v)) return 'NA'; return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtRatio(v, fmt) {
+  if (v === null || !isFinite(v)) return 'NA';
+  if (fmt === 'pct')  return (v * 100).toFixed(2) + '%';
+  if (fmt === 'days') return v.toFixed(2) + ' days';
+  return v.toFixed(2);
+}
+function yearOld() { return parseInt(document.getElementById('yearOld').value) || 0; }
+function yearNew() { return parseInt(document.getElementById('yearNew').value) || 0; }
+function periodLabels() {
+  const n = yearNew();
+  return {
+    hist: [yearOld() || 'Year 1', n || 'Year 2'],
+    proj: n ? [n + 1, n + 2, n + 3] : ['Proj. 1', 'Proj. 2', 'Proj. 3']
+  };
+}
+
+/* ── Date & default years ───────────────────────── */
+(function() {
+  const now = new Date();
+  const m = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('analysisDate').value = m[now.getMonth()] + ' ' + now.getFullYear();
+  document.getElementById('yearNew').value = now.getFullYear() - 1;
+  document.getElementById('yearOld').value = now.getFullYear() - 2;
+})();
+
+/* ── Build input tables ─────────────────────────── */
+function buildHistTable(tableId, items) {
+  const lab = periodLabels().hist;
+  let html = `<thead><tr><th>Line Item</th><th class="yh0">${lab[0]}</th><th class="yh1">${lab[1]}</th></tr></thead><tbody>`;
+  items.forEach(it => {
+    if (it.group) { html += `<tr class="group-row"><td colspan="3">${it.group}</td></tr>`; return; }
+    const note = it.note ? `<small>${it.note}</small>` : '';
+    if (it.calc) {
+      html += `<tr class="calc-row"><td class="lbl">${it.label}</td><td class="num" id="c_${it.calc}_0"></td><td class="num" id="c_${it.calc}_1"></td></tr>`;
+    } else {
+      html += `<tr><td class="lbl">${it.label}${note}</td>` +
+        [0,1].map(i => `<td><input type="number" step="any" id="h_${it.key}_${i}" aria-label="${it.label}, ${i === 0 ? 'oldest' : 'newest'} year" oninput="liveUpdate()"></td>`).join('') +
+        `</tr>`;
+    }
+  });
+  document.getElementById(tableId).innerHTML = html + '</tbody>';
+}
+
+function buildProjTable() {
+  const lab = periodLabels();
+  let html = `<thead><tr><th>Assumption</th><th class="yh1">${lab.hist[1]} (ref.)</th>` +
+    lab.proj.map((p, i) => `<th class="ph${i}">${p}</th>`).join('') + `</tr></thead><tbody>`;
+  PROJ_ITEMS.forEach(it => {
+    if (it.group) { html += `<tr class="group-row"><td colspan="5">${it.group}</td></tr>`; return; }
+    if (it.calc) {
+      html += `<tr class="calc-row"><td class="lbl">${it.label}</td><td class="num"></td>` +
+        [0,1,2].map(i => `<td class="num" id="c_cashPlug_${i}"></td>`).join('') + `</tr>`;
+      return;
+    }
+    const unit = it.type === 'pct' ? ' (%)' : ' ($)';
+    html += `<tr><td class="lbl">${it.label}${unit}<small>${it.note}</small></td><td class="ref" id="ref_${it.key}"></td>` +
+      [0,1,2].map(i => `<td><input type="number" step="any" id="p_${it.key}_${i}" aria-label="${it.label}, projected year ${i + 1}" oninput="liveUpdate()"></td>`).join('') +
+      `</tr>`;
+  });
+  document.getElementById('projTable').innerHTML = html + '</tbody>';
+}
+
+function refreshYearHeaders() {
+  const lab = periodLabels();
+  document.querySelectorAll('.yh0').forEach(el => el.textContent = lab.hist[0]);
+  document.querySelectorAll('.yh1').forEach((el, i) => el.textContent = lab.hist[1] + (el.closest('#projTable') ? ' (ref.)' : ''));
+  lab.proj.forEach((p, i) => document.querySelectorAll('.ph' + i).forEach(el => el.textContent = p));
+  document.getElementById('projYearNote').textContent = 'Projected years: ' + lab.proj.join(', ') + ' (the three years after the newest year).';
+}
+
+/* ── Statement math ─────────────────────────────── */
+// Completes a statement object from its input lines (Financial Statements tab logic).
+function complete(s) {
+  s.gp   = s.rev - s.cogs;
+  s.ebit = s.gp - s.opex;
+  s.ebt  = s.ebit - s.int + s.nre;
+  s.ni   = s.ebt - s.tax;
+  s.tca  = s.cash + s.ar + s.inv + s.oca;
+  s.ta   = s.tca + s.ppe + s.gw + s.intang + s.olta;
+  s.tcl  = s.ap + s.ocl;
+  s.tl   = s.tcl + s.ltd + s.oltl;
+  s.te   = s.cs + s.re + s.ts + s.pic;
+  s.tle  = s.tl + s.te;
+  s.check = s.ta - s.tle;
+  return s;
+}
+
+function readHist(i) {
+  const s = {};
+  [...IS_ITEMS, ...BS_ITEMS].forEach(it => { if (it.key) s[it.key] = num(`h_${it.key}_${i}`); });
+  return complete(s);
+}
+let _hOld = null;
+function hOld() { return _hOld || readHist(0); }
+
+// Builds projected year i from the prior year (Projected Statements tab logic).
+function project(prev, i) {
+  const p = k => num(`p_${k}_${i}`);
+  const pc = k => num(`p_${k}_${i}`) / 100;
+  const s = {};
+  s.rev  = prev.rev * (1 + pc('g'));
+  s.cogs = s.rev * pc('cogsP');
+  s.opex = s.rev * pc('opexP');
+  s.int  = prev.int + p('dInt');
+  s.nre  = p('nre');
+  s.gp   = s.rev - s.cogs;
+  s.ebit = s.gp - s.opex;
+  s.ebt  = s.ebit - s.int + s.nre;
+  s.tax  = s.ebt * pc('taxP');
+  s.ni   = s.ebt - s.tax;
+
+  s.ar     = s.rev * pc('arP');
+  s.inv    = s.rev * pc('invP');
+  s.oca    = s.rev * pc('ocaP');
+  s.ppe    = prev.ppe + p('dPpe');
+  s.gw     = prev.gw + p('dGw');
+  s.intang = prev.intang + p('dInt2');
+  s.olta   = s.rev * pc('oltaP');
+
+  s.ap   = s.rev * pc('apP');
+  s.ocl  = s.rev * pc('oclP');
+  s.ltd  = prev.ltd + p('dLtd');
+  s.oltl = s.rev * pc('oltlP');
+
+  s.cs  = prev.cs + p('dCs');
+  s.re  = prev.re + s.ni - p('divs');
+  s.ts  = prev.ts + p('dTs');
+  s.pic = prev.pic + p('dPic');
+
+  s.tcl = s.ap + s.ocl;
+  s.tl  = s.tcl + s.ltd + s.oltl;
+  s.te  = s.cs + s.re + s.ts + s.pic;
+  s.tle = s.tl + s.te;
+  // Cash is the plug: whatever makes assets equal liabilities plus equity
+  s.cash = s.tle - (s.ar + s.inv + s.oca + s.ppe + s.gw + s.intang + s.olta);
+  s.tca  = s.cash + s.ar + s.inv + s.oca;
+  s.ta   = s.tle;
+  s.check = 0;
+  s.divs = p('divs');
+  return s;
+}
+
+function buildPeriods() {
+  _hOld = null;
+  const h0 = readHist(0), h1 = readHist(1);
+  _hOld = h0;
+  const periods = [h0, h1];
+  if (document.getElementById('useProj').checked) {
+    let prev = h1;
+    for (let i = 0; i < 3; i++) { prev = project(prev, i); periods.push(prev); }
+  }
+  return periods;
+}
+
+/* ── Live updates on Step 2 ─────────────────────── */
+function liveUpdate() {
+  const h = [readHist(0), readHist(1)];
+  _hOld = h[0];
+  const calcKeys = ['gp','ebit','ebt','ni','tca','ta','tcl','tl','te','tle','check'];
+  h.forEach((s, i) => calcKeys.forEach(k => {
+    const el = document.getElementById(`c_${k}_${i}`);
+    if (!el) return;
+    if (k === 'check') {
+      const ok = Math.abs(s.check) <= Math.max(1, Math.abs(s.ta) * 0.005);
+      el.textContent = money(s.check) + (ok ? ' ✓' : ' ✗ out of balance');
+      el.className = 'num ' + (ok ? 'check-ok' : 'check-bad');
+    } else {
+      el.textContent = money(s[k]);
+    }
+  }));
+  // Reference column for projections (newest historical year)
+  PROJ_ITEMS.forEach(it => {
+    if (!it.key) return;
+    const el = document.getElementById('ref_' + it.key);
+    if (!el) return;
+    const v = it.ref(h[1]);
+    el.textContent = v === null || !isFinite(v) ? '—' : it.type === 'pct' ? (v * 100).toFixed(2) + '%' : money(v);
+  });
+  // Projected cash plug preview
+  if (document.getElementById('useProj').checked) {
+    let prev = h[1];
+    for (let i = 0; i < 3; i++) {
+      prev = project(prev, i);
+      const el = document.getElementById('c_cashPlug_' + i);
+      el.textContent = money(prev.cash) + (prev.cash < 0 ? ' ✗' : '');
+      el.className = 'num ' + (prev.cash < 0 ? 'check-bad' : '');
+    }
+  }
+}
+
+function prefillProjections() {
+  const h1 = readHist(1);
+  _hOld = readHist(0);
+  if (!h1.rev) {
+    showFormError('Enter the historical income statement and balance sheet first, then prefill the projections.');
+    return;
+  }
+  PROJ_ITEMS.forEach(it => {
+    if (!it.key) return;
+    let v = 'prefill' in it ? it.prefill : it.ref(h1);
+    if (v === null || !isFinite(v)) v = 0;
+    const val = it.type === 'pct' && !('prefill' in it) ? +(v * 100).toFixed(2) : v;
+    for (let i = 0; i < 3; i++) document.getElementById(`p_${it.key}_${i}`).value = val;
+  });
+  hideFormError();
+  liveUpdate();
+}
+
+/* ── Example data (fictional company) ───────────── */
+function loadExample() {
+  const ex = {
+    rev: [8200, 9100], cogs: [4900, 5350], opex: [2150, 2400], int: [120, 115], nre: [0, -40], tax: [215, 255],
+    cash: [610, 720], ar: [980, 1050], inv: [1150, 1210], oca: [240, 260],
+    ppe: [3100, 3350], gw: [700, 700], intang: [380, 350], olta: [290, 310],
+    ap: [870, 940], ocl: [760, 820], ltd: [2400, 2300], oltl: [410, 430],
+    cs: [500, 500], re: [1450, 1980], ts: [-300, -380], pic: [1360, 1360]
+  };
+  Object.keys(ex).forEach(k => ex[k].forEach((v, i) => document.getElementById(`h_${k}_${i}`).value = v));
+  document.getElementById('useProj').checked = true;
+  toggleProj();
+  prefillProjections();
+  // A sample strategy: faster growth, new plant, some debt, a dividend
+  [8, 7, 6].forEach((v, i) => document.getElementById(`p_g_${i}`).value = v);
+  [450, 300, 200].forEach((v, i) => document.getElementById(`p_dPpe_${i}`).value = v);
+  [300, 0, -200].forEach((v, i) => document.getElementById(`p_dLtd_${i}`).value = v);
+  [20, 0, -15].forEach((v, i) => document.getElementById(`p_dInt_${i}`).value = v);
+  [420, 440, 460].forEach((v, i) => document.getElementById(`p_divs_${i}`).value = v);
+  liveUpdate();
+}
+
+/* ── Form errors ────────────────────────────────── */
+function showFormError(msg) { const e = document.getElementById('form-error'); e.textContent = msg; e.style.display = 'block'; }
+function hideFormError() { document.getElementById('form-error').style.display = 'none'; }
+
+function toggleProj() {
+  document.getElementById('projSection').style.display = document.getElementById('useProj').checked ? 'block' : 'none';
+  liveUpdate();
+}
+
+/* ── Navigation ─────────────────────────────────── */
+function setStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  for (let i = 1; i <= 3; i++) {
+    const node = document.getElementById('node' + i);
+    node.classList.remove('active','done');
+    if (i < n)      node.classList.add('done');
+    else if (i === n) node.classList.add('active');
+  }
+  const pct = n === 1 ? 16 : n === 2 ? 50 : 92;
+  document.getElementById('progressFill').style.width = pct + '%';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function goToStep1() { setStep(1); }
+function goToStep2() { setStep(2); }
+
+document.getElementById('btnToStep2').onclick = function() {
+  const name = document.getElementById('companyName').value.trim();
+  const err  = document.getElementById('err-company');
+  if (!name) {
+    document.getElementById('companyName').classList.add('error');
+    err.style.display = 'block';
+    return;
+  }
+  document.getElementById('companyName').classList.remove('error');
+  err.style.display = 'none';
+  setStep(2);
+};
+
+/* ── Generate Results ───────────────────────────── */
+function generateResults() {
+  const useProj = document.getElementById('useProj').checked;
+  const missing = [];
+  ['rev','cogs'].forEach(k => [0,1].forEach(i => { if (!hasVal(`h_${k}_${i}`)) missing.push(k); }));
+  if (missing.length) { showFormError('Enter Revenue and Cost of Goods Sold for both years before generating results.'); return; }
+  const periods = buildPeriods();
+  if (periods[0].rev <= 0 || periods[1].rev <= 0) { showFormError('Revenue must be greater than zero in both years.'); return; }
+  if (periods[0].ta <= 0 || periods[1].ta <= 0) { showFormError('Enter the balance sheet for both years. Total assets must be greater than zero.'); return; }
+  if (useProj) {
+    const blank = PROJ_ITEMS.filter(it => it.key && [0,1,2].some(i => !hasVal(`p_${it.key}_${i}`)));
+    if (blank.length) {
+      showFormError('Complete every projection assumption (enter 0 where nothing changes), or untick "Include three years of projected statements". Missing: ' + blank.map(b => b.label).join(', ') + '.');
+      return;
+    }
+  }
+  hideFormError();
+
+  const lab = periodLabels();
+  results = {
+    company:  document.getElementById('companyName').value.trim(),
+    industry: document.getElementById('companyIndustry').value.trim(),
+    analyst:  document.getElementById('analystName').value.trim(),
+    date:     document.getElementById('analysisDate').value.trim(),
+    useProj, periods,
+    labels: useProj ? [...lab.hist, ...lab.proj] : lab.hist,
+    ratios: RATIOS.map(r => ({ def: r, vals: periods.map(s => { const v = r.f(s); return v === null || !isFinite(v) ? null : v; }) }))
+  };
+
+  buildValidationAlert();
+  buildRatioTable();
+  buildSparkCards();
+  buildProjSummary();
+  buildStrategyCard();
+  updatePrintHeader();
+  setStep(3);
+}
+
+/* ── Trend & rating helpers ─────────────────────── */
+function trendOf(r, a, b) {
+  const v0 = r.vals[a], v1 = r.vals[b];
+  if (v0 === null || v1 === null) return null;
+  const base = Math.abs(v0) || 1;
+  const chg = (v1 - v0) / base;
+  if (Math.abs(chg) < 0.02) return { dir: 'flat', text: 'Stable', good: null };
+  const rising = v1 > v0;
+  const good = rising === r.def.hib;
+  return { dir: good ? 'up' : 'down', text: (rising ? '▲ ' : '▼ ') + (good ? 'Improving' : 'Declining'), good };
+}
+function ratingOf(r, idx) {
+  const v = r.vals[idx];
+  if (v === null || !r.def.rate) return null;
+  return r.def.rate(v);
+}
+function chip(score) {
+  if (score === null) return '<span class="score-chip" style="background:#f1f5f9;color:#64748b">Trend</span>';
+  const rt = RATING[score];
+  return `<span class="score-chip" style="background:${rt.bg};color:${rt.color}">${rt.text}</span>`;
+}
+
+/* ── Validation alert ───────────────────────────── */
+function buildValidationAlert() {
+  const el = document.getElementById('validationAlert');
+  const msgs = [];
+  results.periods.slice(0, 2).forEach((s, i) => {
+    if (Math.abs(s.check) > Math.max(1, Math.abs(s.ta) * 0.005))
+      msgs.push(`The ${results.labels[i]} balance sheet does not balance: total assets differ from total liabilities and equity by ${money(s.check)}.`);
+  });
+  if (results.useProj) results.periods.slice(2).forEach((s, i) => {
+    if (s.cash < 0) msgs.push(`Projected cash for ${results.labels[i + 2]} is negative (${money(s.cash)}). The projected strategy cannot be funded as entered.`);
+  });
+  if (msgs.length) {
+    el.innerHTML = '<strong>⚠️ These results are not valid until the issues below are fixed.</strong>' + msgs.map(m => esc(m)).join('<br>');
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+/* ── Ratio table ────────────────────────────────── */
+function buildRatioTable() {
+  const L = results.labels, P = results.useProj;
+  let html = `<thead><tr><th>Ratio</th><th>${L[0]}</th><th>${L[1]}</th><th>Trend</th><th>Rating</th>` +
+    (P ? L.slice(2).map(l => `<th class="proj">${l}P</th>`).join('') : '') + `</tr></thead><tbody>`;
+  let lastCat = null;
+  results.ratios.forEach(r => {
+    if (r.def.cat !== lastCat) {
+      lastCat = r.def.cat;
+      html += `<tr class="cat-row"><td colspan="${P ? 8 : 5}" style="color:${CATS[lastCat].color}">${CATS[lastCat].name}</td></tr>`;
+    }
+    const t = trendOf(r, 0, 1);
+    html += `<tr><td>${r.def.name}</td><td>${fmtRatio(r.vals[0], r.def.fmt)}</td><td><strong>${fmtRatio(r.vals[1], r.def.fmt)}</strong></td>` +
+      `<td>${t ? `<span class="trend ${t.dir}">${t.text}</span>` : '—'}</td><td>${chip(ratingOf(r, 1))}</td>` +
+      (P ? [2,3,4].map(i => `<td class="proj">${fmtRatio(r.vals[i], r.def.fmt)}</td>`).join('') : '') + `</tr>`;
+  });
+  document.getElementById('ratioTable').innerHTML = html + '</tbody>';
+
+  const ov = overallScore();
+  const badge = document.getElementById('overallBadge');
+  badge.textContent = 'Overall: ' + ov.label;
+  badge.style.background = ov.bg; badge.style.color = ov.color;
+}
+
+/* ── Sparkline trend cards ──────────────────────── */
+function sparkSVG(vals, nHist, color) {
+  const W = 200, H = 56, pad = 6;
+  const pts = vals.map((v, i) => ({ v, i })).filter(p => p.v !== null);
+  if (pts.length < 2) return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Not enough data to chart"><text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="11" fill="#94a3b8">Not enough data</text></svg>`;
+  let min = Math.min(...pts.map(p => p.v)), max = Math.max(...pts.map(p => p.v));
+  if (max === min) { max += Math.abs(max) * 0.1 || 1; min -= Math.abs(min) * 0.1 || 1; }
+  const n = vals.length;
+  const x = i => pad + (n === 1 ? 0 : i * (W - 2 * pad) / (n - 1));
+  const y = v => H - pad - (v - min) / (max - min) * (H - 2 * pad);
+  const hist = pts.filter(p => p.i < nHist), proj = pts.filter(p => p.i >= nHist - 1);
+  const line = arr => arr.map(p => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Trend line">`;
+  if (nHist < n) svg += `<rect x="${x(nHist - 0.5)}" y="0" width="${W - x(nHist - 0.5)}" height="${H}" fill="#f8fafc"/>`;
+  if (hist.length > 1) svg += `<polyline points="${line(hist)}" fill="none" stroke="${color}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
+  if (proj.length > 1 && nHist < n) svg += `<polyline points="${line(proj)}" fill="none" stroke="${color}" stroke-width="2" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"/>`;
+  pts.forEach(p => svg += `<circle cx="${x(p.i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="2.8" fill="${p.i < nHist ? color : '#fff'}" stroke="${color}" stroke-width="1.5"/>`);
+  return svg + '</svg>';
+}
+function buildSparkCards() {
+  const nHist = 2, L = results.labels;
+  document.getElementById('sparkGrid').innerHTML = results.ratios.map(r => {
+    const c = CATS[r.def.cat].color;
+    const t = trendOf(r, 0, 1);
+    return `<div class="spark-card" style="border-top:3px solid ${c}">
+      <div class="sp-name">${r.def.name}</div>
+      <div class="sp-val">${fmtRatio(r.vals[1], r.def.fmt)}</div>
+      <div class="sp-year">${L[1]}${t ? ' · ' + t.text.replace(/[▲▼] /, '') : ''}</div>
+      ${sparkSVG(r.vals, nHist, c)}
+    </div>`;
+  }).join('');
+  document.getElementById('sparkLegend').innerHTML =
+    Object.values(CATS).map(c => `<span><svg width="14" height="4"><rect width="14" height="4" fill="${c.color}"/></svg>${c.name}</span>`).join('') +
+    `<span>● solid line = historical (${L[0]}–${L[1]})</span>` +
+    (results.useProj ? `<span>○ dashed line, shaded = projected (${L[2]}–${L[4]})</span>` : '');
+}
+
+/* ── Projected statements summary ───────────────── */
+function buildProjSummary() {
+  const wrap = document.getElementById('projSummaryWrap');
+  if (!results.useProj) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const P = results.periods, L = results.labels;
+  const rows = [
+    ['Revenue', 'rev'], ['Gross Profit', 'gp'], ['EBIT (Operating Income)', 'ebit'], ['Interest Expense', 'int'],
+    ['Net Income', 'ni'], ['Dividends Paid', 'divs'],
+    ['Cash and Equivalents (plug)', 'cash'], ['Total Current Assets', 'tca'], ['Total Assets', 'ta'],
+    ['Total Current Liabilities', 'tcl'], ['Long-Term Debt', 'ltd'], ['Total Liabilities', 'tl'],
+    ['Retained Earnings', 're'], ['Total Equity', 'te']
+  ];
+  let html = `<thead><tr><th>Line Item</th><th>${L[1]} (actual)</th>` + L.slice(2).map(l => `<th class="proj">${l}P</th>`).join('') + `</tr></thead><tbody>`;
+  rows.forEach(([label, k]) => {
+    const strong = ['ni','cash','ta','te'].includes(k);
+    html += `<tr><td>${strong ? '<strong>' + label + '</strong>' : label}</td><td>${k === 'divs' ? '—' : money(P[1][k])}</td>` +
+      [2,3,4].map(i => {
+        const v = P[i][k];
+        const bad = k === 'cash' && v < 0;
+        return `<td class="proj"${bad ? ' style="color:#dc2626;font-weight:700"' : ''}>${money(v)}${bad ? ' ✗' : ''}</td>`;
+      }).join('') + `</tr>`;
+  });
+  document.getElementById('projSummary').innerHTML = html + '</tbody>';
+}
+
+/* ── Overall & category scoring ─────────────────── */
+function catScore(cat) {
+  const scores = results.ratios.filter(r => r.def.cat === cat).map(r => ratingOf(r, 1)).filter(s => s !== null);
+  if (!scores.length) return null;
+  return scores.reduce((a, b) => a + b, 0) / scores.length;
+}
+function catTrend(cat) {
+  let good = 0, bad = 0;
+  results.ratios.filter(r => r.def.cat === cat).forEach(r => {
+    const t = trendOf(r, 0, 1);
+    if (t && t.good === true) good++;
+    if (t && t.good === false) bad++;
+  });
+  return { good, bad };
+}
+function overallScore() {
+  const all = results.ratios.map(r => ratingOf(r, 1)).filter(s => s !== null);
+  const avg = all.length ? all.reduce((a, b) => a + b, 0) / all.length : 1;
+  if (avg >= 1.4) return { avg, label: 'Strong',         bg: '#d1fae5', color: '#047857', emoji: '💪' };
+  if (avg >= 0.8) return { avg, label: 'Adequate',       bg: '#fef3c7', color: '#b45309', emoji: '⚖️' };
+  return               { avg, label: 'Under Pressure', bg: '#fee2e2', color: '#b91c1c', emoji: '⚠️' };
+}
+function levelOf(score) { return score === null ? null : score >= 1.4 ? 2 : score >= 0.8 ? 1 : 0; }
+function rv(id, idx) { const r = results.ratios.find(x => x.def.id === id); return fmtRatio(r.vals[idx], r.def.fmt); }
+
+/* ── Strategy Card ──────────────────────────────── */
+function buildStrategyCard() {
+  const co = esc(results.company), L = results.labels, yr = L[1];
+  const ov = overallScore();
+
+  const trendLine = cat => {
+    const t = catTrend(cat);
+    if (!t.good && !t.bad) return 'Most measures were stable from ' + L[0] + ' to ' + yr + '.';
+    return `From ${L[0]} to ${yr}, ${t.good} measure${t.good === 1 ? '' : 's'} improved and ${t.bad} declined.`;
+  };
+  const head = (icon, title, color, lvl) =>
+    `${icon} ${title} ${lvl === null ? '' : chip(lvl)}`;
+
+  // Liquidity
+  const liqL = levelOf(catScore('liq'));
+  const liqRec = [
+    'Rebuild short-term liquidity before pursuing expansion: tighten receivables collection, reduce excess inventory, or secure a committed credit line.',
+    'Liquidity is workable. Protect it by matching new short-term obligations with growth in current assets and keeping a cash cushion for downturns.',
+    'Liquidity is a strength. Excess current assets could fund growth initiatives, debt reduction, or shareholder returns rather than sitting idle.'
+  ][liqL ?? 1];
+  // Leverage
+  const levL = levelOf(catScore('lev'));
+  const levRec = [
+    'The capital structure is stretched. Favor equity financing or retained earnings over new debt, and consider retrenchment or asset sales to reduce obligations.',
+    'Debt is moderate. Additional borrowing is possible for a high-return strategy, but test the projected times-interest-earned ratio before committing.',
+    'Leverage is conservative, which leaves borrowing capacity. Debt financing could fund acquisitions, integration, or expansion at a lower cost than equity.'
+  ][levL ?? 1];
+  // Activity (trend-based)
+  const actT = catTrend('act');
+  const actRec = actT.bad > actT.good
+    ? 'Asset efficiency is slipping. Review idle capacity, slow-moving inventory, and collection terms; operational improvements may free cash for strategy.'
+    : 'Asset efficiency is holding or improving. Compare turnover with direct competitors to confirm whether operations are a competitive advantage.';
+  // Profitability
+  const profL = levelOf(catScore('prof'));
+  const profRec = [
+    'Profitability is weak. Consider cost reduction, pricing review, divesting low-margin lines, or a turnaround strategy before funding growth.',
+    'Profits are positive but not exceptional. Product development or differentiation could lift margins; benchmark against the industry leader.',
+    'Profitability is strong, supporting intensive growth strategies such as market development, product development, or acquisition.'
+  ][profL ?? 1];
+
+  // Projection reality check
+  let projBody;
+  if (results.useProj) {
+    const P = results.periods;
+    const negCash = P.slice(2).some(s => s.cash < 0);
+    const roe0 = results.ratios.find(r => r.def.id === 'roe');
+    const cur = results.ratios.find(r => r.def.id === 'cur');
+    projBody = negCash
+      ? `Projected cash falls below zero, so the strategy as entered cannot be funded. Add financing (debt or equity), reduce dividends or capital spending, or slow the growth assumptions, then regenerate.`
+      : `By ${L[4]}, projected ROE is ${fmtRatio(roe0.vals[4], 'pct')} (vs ${fmtRatio(roe0.vals[1], 'pct')} in ${yr}) and the current ratio is ${fmtRatio(cur.vals[4], 'x')}. If projected ratios look far better than history, check that the assumptions are realistic; if they look worse, explain why the strategy is still worth it.`;
+  } else {
+    projBody = `Projections were not included. Projected statements show whether ${co}'s recommended strategy is affordable; add them to test your recommendation.`;
+  }
+
+  const items = [
+    { color: CATS.liq.color,  title: head('💧', 'Liquidity', CATS.liq.color, liqL),
+      body: `Current ratio ${rv('cur', 1)} and quick ratio ${rv('quick', 1)} in ${yr}. ${trendLine('liq')} ${liqRec}` },
+    { color: CATS.lev.color,  title: head('🏦', 'Leverage', CATS.lev.color, levL),
+      body: `Liabilities are ${rv('dta', 1)} of assets; long-term debt-to-equity is ${rv('lde', 1)}; interest is covered ${rv('tie', 1)} times. ${trendLine('lev')} ${levRec}` },
+    { color: CATS.act.color,  title: head('⚙️', 'Activity', CATS.act.color, null),
+      body: `Total asset turnover ${rv('taT', 1)}, inventory turnover ${rv('invT', 1)}, collection period ${rv('acp', 1)}. ${trendLine('act')} ${actRec}` },
+    { color: CATS.prof.color, title: head('💰', 'Profitability', CATS.prof.color, profL),
+      body: `Gross margin ${rv('gpm', 1)}, operating margin ${rv('opm', 1)}, ROA ${rv('roa', 1)}, ROE ${rv('roe', 1)}. ${trendLine('prof')} ${profRec}` },
+    { color: '#7c3aed', title: '🔮 Projection Reality Check', body: projBody },
+    { color: '#475569', title: '🧭 Using These Results',
+      body: `Use these ratios as the financial position evidence in ${co}'s SPACE Matrix, list financial strengths and weaknesses in the IFE Matrix, and compare the ratios with competitors in the CPM. Ratios describe what happened; strategy explains why and what to do next.` }
+  ];
+
+  const condition = ov.label === 'Under Pressure' ? 'a financial condition under pressure' : `a ${ov.label.toLowerCase()} overall financial condition`;
+  const tagline = `${co}'s ${yr} ratios point to ${condition}. Ratings use general rules of thumb; confirm them against ${results.industry ? esc(results.industry) + ' ' : ''}industry averages before drawing final conclusions.`;
+
+  document.getElementById('strategyCard').innerHTML = `
+    <div class="strategy-header">
+      <div class="icon-big">${ov.emoji}</div>
+      <div><h3>Financial Condition: ${ov.label}</h3><p>${tagline}</p></div>
+    </div>
+    <div class="strategy-grid">
+      ${items.map(s => `<div class="strategy-item"><h4 style="color:${s.color}">${s.title}</h4><p>${s.body}</p></div>`).join('')}
+    </div>`;
+}
+
+/* ── Print Header ───────────────────────────────── */
+function updatePrintHeader() {
+  document.getElementById('print-title').textContent = 'Financial Ratio Analysis — ' + results.company;
+  let meta = [];
+  if (results.industry) meta.push(results.industry);
+  if (results.analyst) meta.push('Analyst: ' + results.analyst);
+  if (results.date) meta.push(results.date);
+  document.getElementById('print-meta').textContent = meta.join('  |  ');
+}
+
+/* ── Reset ──────────────────────────────────────── */
+function resetAll() {
+  results = {};
+  ['companyName','companyIndustry','analystName','analysisDate']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.querySelectorAll('#step2 input[type="number"]').forEach(el => el.value = '');
+  const now = new Date();
+  document.getElementById('yearNew').value = now.getFullYear() - 1;
+  document.getElementById('yearOld').value = now.getFullYear() - 2;
+  document.getElementById('useProj').checked = true;
+  toggleProj();
+  refreshYearHeaders();
+  hideFormError();
+  setStep(1);
+}
+
+/* ── Initialize ─────────────────────────────────── */
+buildHistTable('isTable', IS_ITEMS);
+buildHistTable('bsTable', BS_ITEMS);
+buildProjTable();
+refreshYearHeaders();
+document.getElementById('yearOld').oninput = refreshYearHeaders;
+document.getElementById('yearNew').oninput = refreshYearHeaders;
+document.getElementById('useProj').onchange = toggleProj;
+liveUpdate();
+</script>
+</body>
+</html>

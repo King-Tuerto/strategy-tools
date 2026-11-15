@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IFE Matrix Analysis Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens ──────────────────────────────── */
+:root {
+  --navy:   #0f2342;
+  --cobalt: #1a3a6e;
+  --sky:    #2563eb;
+  --steel:  #64748b;
+  --cloud:  #f1f5f9;
+  --white:  #ffffff;
+  --accent: #f59e0b;
+  --green:  #10b981;
+  --red:    #ef4444;
+  --orange: #f97316;
+  --text:   #1e293b;
+  --muted:  #94a3b8;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow:    0 4px 24px rgba(15,35,66,0.10);
+  --shadow-lg: 0 12px 48px rgba(15,35,66,0.16);
+}
+
+/* ── Reset & Base ───────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text);
+  background: var(--navy);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%,
+      rgba(37,99,235,0.25) 0%, transparent 60%),
+    repeating-linear-gradient(0deg,
+      transparent, transparent 39px,
+      rgba(255,255,255,0.02) 39px,
+      rgba(255,255,255,0.02) 40px),
+    repeating-linear-gradient(90deg,
+      transparent, transparent 39px,
+      rgba(255,255,255,0.02) 39px,
+      rgba(255,255,255,0.02) 40px);
+  min-height: 100vh;
+  line-height: 1.7;
+}
+
+/* ── App Shell ──────────────────────────────────── */
+.app-shell { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; }
+
+/* ── App Header ─────────────────────────────────── */
+.app-header { text-align: center; margin-bottom: 48px; }
+.app-header .eyebrow {
+  display: inline-block;
+  background: rgba(37,99,235,0.25);
+  color: #93c5fd;
+  font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 6px 16px; border-radius: 999px;
+  border: 1px solid rgba(147,197,253,0.25);
+  margin-bottom: 20px;
+}
+.app-header h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  color: var(--white); line-height: 1.1; margin-bottom: 14px;
+}
+.app-header h1 em { font-style: italic; color: #93c5fd; }
+.app-header p {
+  color: #94a3b8; font-size: 1.05rem;
+  max-width: 520px; margin: 0 auto;
+  line-height: 1.7; font-weight: 300;
+}
+
+/* ── Progress Bar ───────────────────────────────── */
+.progress-bar-wrap {
+  display: flex; align-items: center;
+  margin-bottom: 40px; position: relative;
+}
+.progress-bar-wrap::before {
+  content: ''; position: absolute;
+  top: 18px; left: 0; right: 0;
+  height: 2px; background: rgba(255,255,255,0.08); z-index: 0;
+}
+.progress-bar-fill {
+  position: absolute; top: 18px; left: 0;
+  height: 2px; background: var(--sky); z-index: 1;
+  transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+.step-node {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; position: relative; z-index: 2;
+}
+.step-node .bubble {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  border: 2px solid rgba(255,255,255,0.12);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; font-weight: 700;
+  color: var(--muted); transition: all 0.3s ease;
+}
+.step-node.active .bubble {
+  background: var(--sky); border-color: var(--sky);
+  color: white; box-shadow: 0 0 0 4px rgba(37,99,235,0.25);
+}
+.step-node.done .bubble {
+  background: var(--green); border-color: var(--green); color: white;
+}
+.step-node .step-label {
+  font-size: 0.7rem; font-weight: 600;
+  color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.08em; transition: color 0.3s;
+}
+.step-node.active .step-label { color: #93c5fd; }
+.step-node.done .step-label   { color: var(--green); }
+
+/* ── Card ───────────────────────────────────────── */
+.card {
+  background: var(--white); border-radius: 20px;
+  box-shadow: var(--shadow-lg); overflow: hidden;
+  animation: slideUp 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card-header {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%);
+  padding: 28px 36px; display: flex; align-items: center; gap: 16px;
+}
+.card-header h2 {
+  font-family: 'DM Serif Display', serif;
+  color: white; font-size: 1.5rem;
+}
+.card-header p {
+  color: #94a3b8; font-size: 0.85rem; margin-top: 4px; font-weight: 300;
+}
+.card-header .icon {
+  width: 48px; height: 48px;
+  background: rgba(255,255,255,0.1); border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; flex-shrink: 0;
+}
+.card-body { padding: 36px; }
+
+/* ── Step Visibility ────────────────────────────── */
+.step { display: none; }
+.step.active { display: block; }
+
+/* ── Form Inputs ────────────────────────────────── */
+.form-group { margin-bottom: 20px; }
+.form-group label {
+  display: block; font-size: 0.82rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--steel); margin-bottom: 8px;
+}
+input[type="text"],
+input[type="number"],
+textarea {
+  width: 100%; padding: 13px 16px;
+  border: 2px solid var(--border); border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif; font-size: 1rem;
+  color: var(--text); background: var(--cloud);
+  transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+}
+input:focus, textarea:focus {
+  border-color: var(--sky);
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.12);
+  background: white;
+}
+input.error {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
+}
+.error-msg {
+  font-size: 0.8rem; color: var(--red);
+  margin-top: 5px; font-weight: 500; display: none;
+}
+
+/* ── Buttons ────────────────────────────────────── */
+.btn {
+  padding: 13px 28px; border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif; font-size: 0.9rem;
+  font-weight: 700; cursor: pointer; border: 2px solid transparent;
+  transition: all 0.2s ease; display: inline-flex;
+  align-items: center; gap: 8px;
+}
+.btn-primary {
+  background: var(--sky); color: white;
+  box-shadow: 0 4px 16px rgba(37,99,235,0.30);
+}
+.btn-primary:hover {
+  background: #1d4ed8; transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(37,99,235,0.35);
+}
+.btn-secondary {
+  background: transparent; color: var(--steel);
+  border-color: var(--border);
+}
+.btn-secondary:hover { background: var(--cloud); color: var(--text); }
+.btn-accent {
+  background: var(--accent); color: white;
+  box-shadow: 0 4px 16px rgba(245,158,11,0.30);
+}
+.btn-accent:hover { background: #d97706; transform: translateY(-1px); }
+.btn-row {
+  display: flex; gap: 12px; justify-content: flex-end;
+  flex-wrap: wrap; margin-top: 28px;
+}
+
+/* ── Hint Box ───────────────────────────────────── */
+.hint-box {
+  background: #eff6ff; border: 1px solid #bfdbfe;
+  border-radius: 12px; padding: 18px 20px;
+  margin-bottom: 28px; font-size: 0.85rem;
+  color: #1e40af; line-height: 1.7;
+}
+
+/* ── IFE Factor Table ───────────────────────────── */
+.ife-table-wrap {
+  border: 2px solid var(--border); border-radius: 16px;
+  overflow: hidden; margin-bottom: 24px;
+}
+.ife-section-header {
+  padding: 14px 18px; display: flex; align-items: center; gap: 10px;
+  border-bottom: 2px solid var(--border);
+}
+.ife-section-header .dim-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.ife-section-header h3 {
+  font-size: 0.82rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em; color: var(--text);
+}
+.ife-section-header .dim-abbr {
+  margin-left: auto; font-size: 0.72rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 999px;
+}
+.ife-section-body { padding: 14px 18px; background: var(--cloud); }
+.ife-section-divider { border-top: 3px solid var(--border); }
+
+/* Column headers */
+.col-headers {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.col-headers span {
+  font-size: 0.68rem; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em;
+}
+.col-headers .ch-num   { width: 16px; flex-shrink: 0; }
+.col-headers .ch-label { flex: 1; }
+.col-headers .ch-weight { width: 72px; text-align: center; flex-shrink: 0; }
+.col-headers .ch-rating { width: 72px; text-align: center; flex-shrink: 0; }
+.col-headers .ch-wscore { width: 72px; text-align: center; flex-shrink: 0; }
+.col-headers .ch-del   { width: 26px; flex-shrink: 0; }
+
+/* Factor rows */
+.factor-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px; animation: rowIn 0.2s ease;
+}
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.factor-row .row-num {
+  font-size: 0.68rem; font-weight: 700;
+  color: var(--muted); width: 16px; text-align: right; flex-shrink: 0;
+}
+.factor-row .label-input {
+  flex: 1;
+  padding: 7px 10px !important; font-size: 0.82rem !important;
+  background: white !important;
+  border: 1.5px solid var(--border) !important;
+  border-radius: 8px !important;
+}
+.factor-row .label-input:focus {
+  border-color: var(--sky) !important;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.10) !important;
+}
+.factor-row .weight-input,
+.factor-row .rating-input {
+  width: 72px !important; text-align: center !important;
+  padding: 7px 8px !important; font-size: 0.88rem !important;
+  background: white !important;
+  border: 1.5px solid var(--border) !important;
+  border-radius: 8px !important; flex-shrink: 0;
+}
+.factor-row .wscore-display {
+  width: 72px; text-align: center; font-size: 0.85rem;
+  font-weight: 700; color: var(--steel); flex-shrink: 0;
+}
+.remove-btn {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: none; background: transparent;
+  color: var(--muted); cursor: pointer; font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s; flex-shrink: 0;
+}
+.remove-btn:hover { background: #fee2e2; color: var(--red); }
+.remove-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+
+/* Section footer */
+.ife-section-footer {
+  display: flex; align-items: center;
+  justify-content: space-between; margin-top: 10px; gap: 10px;
+}
+.add-btn {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.78rem; font-weight: 700; color: var(--sky);
+  background: rgba(37,99,235,0.08);
+  border: 1.5px dashed rgba(37,99,235,0.3);
+  border-radius: 8px; padding: 6px 12px;
+  cursor: pointer; transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.add-btn:hover { background: rgba(37,99,235,0.15); border-color: var(--sky); }
+.add-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Weight total bar */
+.weight-total-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; background: var(--white);
+  border-top: 2px solid var(--border);
+}
+.weight-total-bar .wt-label {
+  font-size: 0.82rem; font-weight: 700; color: var(--steel);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.weight-total-bar .wt-value {
+  font-size: 1rem; font-weight: 700;
+}
+.weight-total-bar .wt-total-score {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.2rem; font-weight: 700;
+}
+.wt-warn { color: var(--orange); }
+.wt-ok   { color: var(--green); }
+
+/* ── Form Error ─────────────────────────────────── */
+#form-error {
+  background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 8px; padding: 12px 16px;
+  margin-bottom: 20px; color: #dc2626;
+  font-size: 0.85rem; font-weight: 500;
+}
+
+/* ── Results — Score Summary Table ──────────────── */
+.score-summary {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow); overflow: hidden;
+  margin-bottom: 28px;
+}
+.score-table { width: 100%; border-collapse: collapse; }
+.score-table th {
+  background: var(--cloud); padding: 12px 20px;
+  text-align: left; font-size: 0.75rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--steel); border-bottom: 2px solid var(--border);
+}
+.score-table td {
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.score-table tr:last-child td { border-bottom: none; }
+.score-table .dim-name { font-weight: 700; }
+.score-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 52px; height: 28px; border-radius: 6px;
+  font-size: 0.85rem; font-weight: 700;
+}
+.coord-row { background: var(--navy); }
+.coord-row td {
+  border-bottom: none !important; padding: 16px 20px; color: white;
+}
+.coord-row .coord-pair {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.3rem; color: #93c5fd;
+}
+
+/* ── Chart Wrap ─────────────────────────────────── */
+.chart-wrap {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow); overflow: hidden;
+  margin-bottom: 28px;
+}
+.chart-topbar {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%);
+  padding: 18px 24px; display: flex; align-items: center; gap: 12px;
+}
+.chart-topbar h3 {
+  font-family: 'DM Serif Display', serif;
+  color: white; font-size: 1.15rem;
+}
+.chart-topbar .chart-icon {
+  width: 40px; height: 40px;
+  background: rgba(255,255,255,0.1); border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; flex-shrink: 0;
+}
+.chart-body { padding: 28px; }
+
+/* ── Strategy Card ──────────────────────────────── */
+.strategy-card {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow); overflow: hidden;
+  margin-bottom: 28px;
+}
+.strategy-header {
+  padding: 24px 28px 20px; border-bottom: 2px solid var(--border);
+  display: flex; align-items: flex-start; gap: 16px;
+}
+.strategy-header .icon-big { font-size: 2rem; line-height: 1; }
+.strategy-header h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.3rem; color: var(--text); margin-bottom: 4px;
+}
+.strategy-header p { color: var(--steel); font-size: 0.88rem; line-height: 1.6; }
+.strategy-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+}
+.strategy-item {
+  padding: 20px 24px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.strategy-item:hover { background: var(--cloud); }
+.strategy-item:nth-child(even) { border-right: none; }
+.strategy-item:nth-last-child(-n+2) { border-bottom: none; }
+.strategy-item h4 {
+  font-size: 0.88rem; font-weight: 700;
+  margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
+}
+.strategy-item p { font-size: 0.82rem; color: var(--steel); line-height: 1.6; }
+
+/* ── Score Gauge ────────────────────────────────── */
+.score-gauge-wrap {
+  display: flex; flex-direction: column; align-items: center;
+  margin-bottom: 16px;
+}
+.score-gauge-label {
+  font-size: 0.75rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--steel); margin-bottom: 12px;
+}
+.score-gauge-big {
+  font-family: 'DM Serif Display', serif;
+  font-size: 3rem; line-height: 1; margin-bottom: 4px;
+}
+.score-gauge-range {
+  font-size: 0.78rem; color: var(--muted); font-weight: 500;
+}
+
+/* ── Print Validation Alert ────────────────────── */
+.print-alert {
+  background: #fef2f2;
+  border: 2px solid #fca5a5;
+  border-radius: 12px;
+  padding: 16px 24px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.print-alert p {
+  color: #dc2626;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ── Print ──────────────────────────────────────── */
+.print-only { display: none; }
+
+@media print {
+  body { background: white !important; color: black; }
+  @page { margin: 1.5cm; }
+  .app-header, .progress-bar-wrap, .no-print, #step1, #step2 { display: none !important; }
+  .print-only { display: block !important; }
+  #step3 { display: block !important; }
+  .card, .chart-wrap, .score-summary, .strategy-card {
+    box-shadow: none !important; border: 1px solid #ddd;
+  }
+  .card-header, .chart-topbar {
+    background: #1a3a6e !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .app-shell { padding: 0; max-width: 100%; }
+  canvas { max-width: 500px; margin: 0 auto; display: block; }
+  .strategy-item { break-inside: avoid; }
+  .score-summary { break-inside: avoid; }
+  .chart-wrap { break-inside: avoid; }
+  .strategy-grid { grid-template-columns: 1fr 1fr; }
+  .print-alert {
+    background: #fef2f2 !important;
+    border: 3px solid #dc2626 !important;
+    border-radius: 0 !important;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-alert p {
+    color: #dc2626 !important;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .print-header {
+    text-align: center; padding: 20px 0 30px;
+    border-bottom: 3px solid #1a3a6e; margin-bottom: 24px;
+  }
+  .print-header h1 {
+    font-size: 1.8rem; color: #1a3a6e;
+    font-family: 'DM Serif Display', serif;
+  }
+  .print-header p { color: #666; font-size: 0.9rem; margin-top: 6px; }
+}
+
+/* ── Responsive ─────────────────────────────────── */
+@media (max-width: 620px) {
+  .strategy-grid { grid-template-columns: 1fr; }
+  .factor-row .label-input { min-width: 0; }
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- App Header -->
+  <div class="app-header no-print">
+    <div class="eyebrow">Strategic Management Tool</div>
+    <h1>IFE Matrix <em>Analysis</em></h1>
+    <p>Evaluate internal strengths and weaknesses to determine your company's overall internal strategic position.</p>
+  </div>
+
+  <!-- Progress Bar -->
+  <div class="progress-bar-wrap no-print" id="progressBar">
+    <div class="progress-bar-fill" id="progressFill" style="width:16%"></div>
+    <div class="step-node active" id="node1">
+      <div class="bubble">1</div>
+      <span class="step-label">Company</span>
+    </div>
+    <div class="step-node" id="node2">
+      <div class="bubble">2</div>
+      <span class="step-label">Factors</span>
+    </div>
+    <div class="step-node" id="node3">
+      <div class="bubble">3</div>
+      <span class="step-label">Results</span>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 1 ═══════════ -->
+  <div class="step active" id="step1">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">🏢</div>
+        <div>
+          <h2>Company Information</h2>
+          <p>Identify the organization being analyzed</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="companyName">Company Name *</label>
+          <input type="text" id="companyName" placeholder="e.g. Apple Inc." aria-label="Company Name">
+          <div class="error-msg" id="err-company">Please enter a company name to continue.</div>
+        </div>
+        <div class="form-group">
+          <label for="companyIndustry">Industry / Sector</label>
+          <input type="text" id="companyIndustry" placeholder="e.g. Consumer Electronics" aria-label="Industry or Sector">
+        </div>
+        <div class="form-group">
+          <label for="analystName">Analyst Name</label>
+          <input type="text" id="analystName" placeholder="e.g. Jane Smith" aria-label="Analyst Name">
+        </div>
+        <div class="form-group">
+          <label for="analysisDate">Date</label>
+          <input type="text" id="analysisDate" placeholder="" aria-label="Analysis Date">
+        </div>
+
+        <div class="hint-box">
+          <strong>How the IFE Matrix works:</strong><br>
+          You will identify key <strong>strengths</strong> and <strong>weaknesses</strong> for this company, then assign each a <strong>weight</strong> (0.00 to 1.00) reflecting its importance. All weights across both sections must sum to <strong>1.00</strong>. Each factor also receives a <strong>rating</strong>: strengths are rated <strong>3</strong> (minor) or <strong>4</strong> (major), weaknesses are rated <strong>1</strong> (major) or <strong>2</strong> (minor). The total weighted score ranges from 1.0 to 4.0, with 2.5 as the midpoint.
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnToStep2">Continue to Factors &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 2 ═══════════ -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">📊</div>
+        <div>
+          <h2>Internal Factors</h2>
+          <p>Enter strengths, weaknesses, weights, and ratings</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="hint-box">
+          <strong>📘 How to use this tool:</strong><br>
+          &bull; <strong>Weight</strong> each factor from 0.00 to 1.00 based on its relative importance. All weights must sum to <strong>1.00</strong>.<br>
+          &bull; <strong>Rate</strong> each strength as <strong>3</strong> (minor strength) or <strong>4</strong> (major strength).<br>
+          &bull; <strong>Rate</strong> each weakness as <strong>1</strong> (major weakness) or <strong>2</strong> (minor weakness).<br>
+          &bull; The weighted score for each factor = Weight &times; Rating.<br>
+          &bull; You can edit factor names, add rows (up to 10 per section), or remove rows.
+        </div>
+
+        <!-- IFE Table -->
+        <div class="ife-table-wrap" id="ifeTable">
+          <!-- Strengths Section -->
+          <div class="ife-section-header" style="background:#f0fdf4">
+            <div class="dim-dot" style="background:#16a34a"></div>
+            <h3>Strengths</h3>
+            <span class="dim-abbr" style="background:#dcfce7;color:#15803d">S</span>
+          </div>
+          <div class="ife-section-body" id="strengthsBody">
+            <div class="col-headers">
+              <span class="ch-num"></span>
+              <span class="ch-label">Factor Name <span style="font-weight:400;opacity:0.7">(click to edit)</span></span>
+              <span class="ch-weight">Weight</span>
+              <span class="ch-rating">Rating</span>
+              <span class="ch-wscore">W. Score</span>
+              <span class="ch-del"></span>
+            </div>
+            <div class="factor-list" id="factors-strengths"></div>
+            <div class="ife-section-footer">
+              <button class="add-btn" id="add-strengths" onclick="addRow('strengths')">
+                <span style="font-size:1.1rem;line-height:1">+</span> Add Strength
+              </button>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div class="ife-section-divider"></div>
+
+          <!-- Weaknesses Section -->
+          <div class="ife-section-header" style="background:#fef2f2">
+            <div class="dim-dot" style="background:#dc2626"></div>
+            <h3>Weaknesses</h3>
+            <span class="dim-abbr" style="background:#fee2e2;color:#dc2626">W</span>
+          </div>
+          <div class="ife-section-body" id="weaknessesBody">
+            <div class="col-headers">
+              <span class="ch-num"></span>
+              <span class="ch-label">Factor Name <span style="font-weight:400;opacity:0.7">(click to edit)</span></span>
+              <span class="ch-weight">Weight</span>
+              <span class="ch-rating">Rating</span>
+              <span class="ch-wscore">W. Score</span>
+              <span class="ch-del"></span>
+            </div>
+            <div class="factor-list" id="factors-weaknesses"></div>
+            <div class="ife-section-footer">
+              <button class="add-btn" id="add-weaknesses" onclick="addRow('weaknesses')">
+                <span style="font-size:1.1rem;line-height:1">+</span> Add Weakness
+              </button>
+            </div>
+          </div>
+
+          <!-- Weight Total Bar -->
+          <div class="weight-total-bar">
+            <div>
+              <span class="wt-label">Total Weight: </span>
+              <span class="wt-value" id="weightTotalDisplay">0.00 / 1.00</span>
+            </div>
+            <div>
+              <span class="wt-label">Running Total: </span>
+              <span class="wt-total-score" id="runningTotalDisplay">0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="form-error" style="display:none;"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="goToStep1()">← Back</button>
+          <button class="btn btn-primary" onclick="generateResults()">Generate Results &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 3 ═══════════ -->
+  <div class="step" id="step3">
+    <!-- Print Header -->
+    <div class="print-only print-header">
+      <h1 id="print-title">IFE Matrix Analysis</h1>
+      <p id="print-meta"></p>
+    </div>
+
+    <!-- Print Validation Alert (shown when weights ≠ 1.0) -->
+    <div class="print-alert" id="printValidationAlert" style="display:none;">
+      <p id="printAlertText"></p>
+    </div>
+
+    <!-- Score Summary Table -->
+    <div class="score-summary">
+      <table class="score-table">
+        <thead>
+          <tr>
+            <th>Section</th>
+            <th>Factors &amp; Weighted Scores</th>
+            <th>Subtotal</th>
+          </tr>
+        </thead>
+        <tbody id="scoreTableBody"></tbody>
+        <tbody>
+          <tr class="coord-row">
+            <td colspan="2"><strong>Total Weighted Score</strong></td>
+            <td><span class="coord-pair" id="totalScoreDisplay">&mdash;</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-wrap">
+      <div class="chart-topbar">
+        <div class="chart-icon">📊</div>
+        <h3>Weighted Score Breakdown</h3>
+      </div>
+      <div class="chart-body">
+        <div class="score-gauge-wrap">
+          <div class="score-gauge-label">Total Weighted Score</div>
+          <div class="score-gauge-big" id="gaugeScore">&mdash;</div>
+          <div class="score-gauge-range">Scale: 1.00 (weakest) &mdash; 4.00 (strongest) &mdash; Midpoint: 2.50</div>
+        </div>
+        <canvas id="ifeCanvas" width="700" height="400" style="width:100%;height:auto;"></canvas>
+      </div>
+    </div>
+
+    <!-- Strategy Card -->
+    <div class="strategy-card" id="strategyCard"></div>
+
+    <!-- Action Buttons -->
+    <div class="btn-row no-print">
+      <button class="btn btn-secondary" onclick="goToStep2()">← Edit Scores</button>
+      <button class="btn btn-secondary" onclick="resetAll()">↺ Start Over</button>
+      <button class="btn btn-accent" onclick="window.print()">🖨️ Print / Save PDF</button>
+    </div>
+  </div>
+
+</div><!-- /app-shell -->
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   IFE Matrix Tool — JavaScript
+   ═══════════════════════════════════════════════════════ */
+
+const MAX_ROWS = 10, MIN_ROWS = 1;
+
+const SECTIONS = [
+  {
+    id: 'strengths',
+    name: 'Strengths',
+    color: '#16a34a',
+    ratingMin: 3, ratingMax: 4,
+    ratingHint: '3 = minor, 4 = major',
+    defaults: [
+      'Strong Brand Reputation',
+      'Proprietary Technology / R&D',
+      'Experienced Management Team',
+      'Strong Financial Performance'
+    ]
+  },
+  {
+    id: 'weaknesses',
+    name: 'Weaknesses',
+    color: '#dc2626',
+    ratingMin: 1, ratingMax: 2,
+    ratingHint: '1 = major, 2 = minor',
+    defaults: [
+      'Limited Market Share',
+      'High Operating Costs',
+      'Outdated Product Lines',
+      'Weak Online Presence'
+    ]
+  }
+];
+
+let results = {};
+
+/* ── Set initial date ───────────────────────────── */
+(function() {
+  const now = new Date();
+  const months = ['January','February','March','April','May','June',
+    'July','August','September','October','November','December'];
+  document.getElementById('analysisDate').value =
+    months[now.getMonth()] + ' ' + now.getFullYear();
+})();
+
+/* ── Step Navigation ────────────────────────────── */
+function setStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  for (let i = 1; i <= 3; i++) {
+    const node = document.getElementById('node' + i);
+    node.classList.remove('active','done');
+    if (i < n)      node.classList.add('done');
+    else if (i === n) node.classList.add('active');
+  }
+  const pct = n === 1 ? 16 : n === 2 ? 50 : 92;
+  document.getElementById('progressFill').style.width = pct + '%';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function goToStep1() { setStep(1); }
+function goToStep2() { setStep(2); }
+
+/* ── Step 1 Validation ──────────────────────────── */
+document.getElementById('btnToStep2').onclick = function() {
+  const name = document.getElementById('companyName').value.trim();
+  const err  = document.getElementById('err-company');
+  if (!name) {
+    document.getElementById('companyName').classList.add('error');
+    err.style.display = 'block';
+    return;
+  }
+  document.getElementById('companyName').classList.remove('error');
+  err.style.display = 'none';
+  setStep(2);
+};
+
+/* ── Build Factor Rows ──────────────────────────── */
+function buildSections() {
+  SECTIONS.forEach(s => {
+    const list = document.getElementById('factors-' + s.id);
+    list.innerHTML = '';
+    s.defaults.forEach(label => addRow(s.id, label));
+  });
+  updateTotals();
+}
+
+function addRow(sectionId, labelText) {
+  const s = SECTIONS.find(x => x.id === sectionId);
+  const list = document.getElementById('factors-' + sectionId);
+  if (list.querySelectorAll('.factor-row').length >= MAX_ROWS) return;
+
+  const row = document.createElement('div');
+  row.className = 'factor-row';
+
+  const num = document.createElement('span');
+  num.className = 'row-num';
+  num.textContent = list.querySelectorAll('.factor-row').length + 1;
+
+  const labelIn = document.createElement('input');
+  labelIn.type = 'text';
+  labelIn.className = 'label-input';
+  labelIn.placeholder = 'Factor name...';
+  labelIn.value = labelText || '';
+  labelIn.maxLength = 50;
+  labelIn.setAttribute('aria-label', s.name + ' factor label');
+
+  const weightIn = document.createElement('input');
+  weightIn.type = 'number';
+  weightIn.className = 'weight-input';
+  weightIn.min = 0; weightIn.max = 1; weightIn.step = 0.01;
+  weightIn.placeholder = '0.00';
+  weightIn.setAttribute('aria-label', s.name + ' weight');
+  weightIn.addEventListener('input', updateTotals);
+
+  const ratingIn = document.createElement('input');
+  ratingIn.type = 'number';
+  ratingIn.className = 'rating-input';
+  ratingIn.min = s.ratingMin; ratingIn.max = s.ratingMax; ratingIn.step = 1;
+  ratingIn.placeholder = s.ratingMin + '-' + s.ratingMax;
+  ratingIn.setAttribute('aria-label', s.name + ' rating (' + s.ratingHint + ')');
+  ratingIn.addEventListener('input', function() {
+    validateRating(this, s);
+    updateTotals();
+  });
+
+  const wscoreDisp = document.createElement('span');
+  wscoreDisp.className = 'wscore-display';
+  wscoreDisp.textContent = '—';
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'remove-btn';
+  delBtn.title = 'Remove this factor';
+  delBtn.innerHTML = '✕';
+  delBtn.onclick = () => removeRow(sectionId, row);
+
+  row.append(num, labelIn, weightIn, ratingIn, wscoreDisp, delBtn);
+  list.appendChild(row);
+  updateRowNumbers(sectionId);
+  updateAddBtn(sectionId);
+  updateTotals();
+  if (!labelText) labelIn.focus();
+}
+
+function removeRow(sectionId, rowEl) {
+  const list = document.getElementById('factors-' + sectionId);
+  if (list.querySelectorAll('.factor-row').length <= MIN_ROWS) return;
+  rowEl.style.cssText = 'opacity:0;transform:translateX(8px);transition:opacity 0.18s,transform 0.18s;';
+  setTimeout(() => {
+    rowEl.remove();
+    updateRowNumbers(sectionId);
+    updateAddBtn(sectionId);
+    updateTotals();
+  }, 190);
+}
+
+function updateRowNumbers(sectionId) {
+  const rows = document.querySelectorAll('#factors-' + sectionId + ' .factor-row');
+  rows.forEach((r, i) => {
+    r.querySelector('.row-num').textContent = i + 1;
+    r.querySelector('.remove-btn').disabled = (rows.length <= MIN_ROWS);
+  });
+}
+
+function updateAddBtn(sectionId) {
+  const btn = document.getElementById('add-' + sectionId);
+  if (btn) btn.disabled =
+    document.getElementById('factors-' + sectionId)
+      .querySelectorAll('.factor-row').length >= MAX_ROWS;
+}
+
+function validateRating(input, section) {
+  const val = parseInt(input.value);
+  if (input.value !== '' && (isNaN(val) || val < section.ratingMin || val > section.ratingMax)) {
+    input.classList.add('error');
+    input.title = 'Rating must be ' + section.ratingMin + ' or ' + section.ratingMax;
+  } else {
+    input.classList.remove('error');
+    input.title = '';
+  }
+}
+
+/* ── Live Totals ────────────────────────────────── */
+function updateTotals() {
+  let totalWeight = 0;
+  let totalWeightedScore = 0;
+
+  SECTIONS.forEach(s => {
+    const rows = document.querySelectorAll('#factors-' + s.id + ' .factor-row');
+    rows.forEach(row => {
+      const w = parseFloat(row.querySelector('.weight-input').value);
+      const r = parseFloat(row.querySelector('.rating-input').value);
+      const disp = row.querySelector('.wscore-display');
+      if (!isNaN(w) && !isNaN(r)) {
+        const ws = w * r;
+        disp.textContent = ws.toFixed(2);
+        disp.style.color = s.color;
+        totalWeight += w;
+        totalWeightedScore += ws;
+      } else {
+        disp.textContent = '—';
+        disp.style.color = 'var(--steel)';
+        if (!isNaN(w)) totalWeight += w;
+      }
+    });
+  });
+
+  // Update weight total display
+  const wtDisp = document.getElementById('weightTotalDisplay');
+  wtDisp.textContent = totalWeight.toFixed(2) + ' / 1.00';
+  if (Math.abs(totalWeight - 1.0) < 0.005) {
+    wtDisp.className = 'wt-value wt-ok';
+  } else {
+    wtDisp.className = 'wt-value wt-warn';
+  }
+
+  // Running total
+  const rtDisp = document.getElementById('runningTotalDisplay');
+  rtDisp.textContent = totalWeightedScore.toFixed(2);
+}
+
+/* ── Collect Factor Data ────────────────────────── */
+function getFactorData(sectionId) {
+  const s = SECTIONS.find(x => x.id === sectionId);
+  return [...document.querySelectorAll('#factors-' + sectionId + ' .factor-row')]
+    .map((row, i) => {
+      const label = row.querySelector('.label-input').value.trim() || 'Factor ' + (i + 1);
+      const weight = parseFloat(row.querySelector('.weight-input').value);
+      const rating = parseFloat(row.querySelector('.rating-input').value);
+      const weighted = (!isNaN(weight) && !isNaN(rating)) ? weight * rating : NaN;
+      return { label, weight, rating, weighted };
+    });
+}
+
+/* ── Generate Results ───────────────────────────── */
+function generateResults() {
+  const errBox = document.getElementById('form-error');
+  errBox.style.display = 'none';
+  const errors = [];
+
+  // Collect data
+  const strengthsData = getFactorData('strengths');
+  const weaknessesData = getFactorData('weaknesses');
+
+  // Validate: at least 1 of each with valid scores
+  const validS = strengthsData.filter(f => !isNaN(f.weighted));
+  const validW = weaknessesData.filter(f => !isNaN(f.weighted));
+
+  if (validS.length === 0) errors.push('Enter at least one strength with a weight and rating.');
+  if (validW.length === 0) errors.push('Enter at least one weakness with a weight and rating.');
+
+  // Validate ratings in range
+  let ratingError = false;
+  strengthsData.forEach(f => {
+    if (!isNaN(f.rating) && (f.rating < 3 || f.rating > 4)) {
+      ratingError = true;
+    }
+  });
+  weaknessesData.forEach(f => {
+    if (!isNaN(f.rating) && (f.rating < 1 || f.rating > 2)) {
+      ratingError = true;
+    }
+  });
+  if (ratingError) errors.push('Strength ratings must be 3 or 4. Weakness ratings must be 1 or 2.');
+
+  if (errors.length) {
+    errBox.innerHTML = errors.join('<br>');
+    errBox.style.display = 'block';
+    return;
+  }
+
+  // Weight sum warning (don't block)
+  const allValid = [...validS, ...validW];
+  const weightSum = allValid.reduce((a, b) => a + b.weight, 0);
+  const totalScore = allValid.reduce((a, b) => a + b.weighted, 0);
+
+  // Show/hide the print validation alert
+  const alertDiv = document.getElementById('printValidationAlert');
+  const alertText = document.getElementById('printAlertText');
+  if (Math.abs(weightSum - 1.0) >= 0.005) {
+    alertText.textContent =
+      '⚠ RESULTS NOT VALID — Total weight is ' + weightSum.toFixed(2) +
+      '. Weights must sum to 1.00 for results to be accurate.';
+    alertDiv.style.display = 'block';
+  } else {
+    alertDiv.style.display = 'none';
+  }
+
+  results = {
+    company: document.getElementById('companyName').value.trim(),
+    industry: document.getElementById('companyIndustry').value.trim(),
+    analyst: document.getElementById('analystName').value.trim(),
+    date: document.getElementById('analysisDate').value.trim(),
+    strengths: validS,
+    weaknesses: validW,
+    weightSum: weightSum,
+    totalScore: totalScore
+  };
+
+  buildScoreTable();
+  drawChart();
+  buildStrategyCard();
+  updatePrintHeader();
+  setStep(3);
+}
+
+/* ── Score Table ────────────────────────────────── */
+function buildScoreTable() {
+  const r = results;
+  const tbody = document.getElementById('scoreTableBody');
+
+  const sections = [
+    { name: 'Strengths', color: '#16a34a', data: r.strengths },
+    { name: 'Weaknesses', color: '#dc2626', data: r.weaknesses }
+  ];
+
+  let weightWarning = '';
+  if (Math.abs(r.weightSum - 1.0) >= 0.005) {
+    weightWarning = `<tr><td colspan="3" style="background:#fffbeb;color:#b45309;font-size:0.82rem;font-weight:600;padding:10px 20px;">
+      ⚠ Total weight is ${r.weightSum.toFixed(2)} — it should equal 1.00 for accurate results.
+    </td></tr>`;
+  }
+
+  tbody.innerHTML = sections.map(s => `
+    <tr>
+      <td><span class="dim-name" style="color:${s.color}">${s.name}</span></td>
+      <td style="font-size:0.8rem;color:var(--steel);">
+        ${s.data.map(f =>
+          `${f.label} (w:${f.weight.toFixed(2)}, r:${f.rating}) = <strong>${f.weighted.toFixed(2)}</strong>`
+        ).join(' &nbsp;|&nbsp; ')}
+      </td>
+      <td>
+        <span class="score-chip" style="background:${s.color}20;color:${s.color};">
+          ${s.data.reduce((a,b) => a + b.weighted, 0).toFixed(2)}
+        </span>
+      </td>
+    </tr>
+  `).join('') + weightWarning;
+
+  document.getElementById('totalScoreDisplay').textContent = r.totalScore.toFixed(2);
+}
+
+/* ── Canvas Chart ───────────────────────────────── */
+function drawChart() {
+  const canvas = document.getElementById('ifeCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const r = results;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Combine factors: sorted by weighted score descending within each section
+  const sortedStrengths = [...r.strengths]
+    .sort((a, b) => b.weighted - a.weighted)
+    .map(f => ({ ...f, type: 'strength', color: '#16a34a', bg: '#dcfce7' }));
+  const sortedWeaknesses = [...r.weaknesses]
+    .sort((a, b) => b.weighted - a.weighted)
+    .map(f => ({ ...f, type: 'weakness', color: '#dc2626', bg: '#fee2e2' }));
+  const allFactors = [...sortedStrengths, ...sortedWeaknesses];
+
+  const maxWS = Math.max(...allFactors.map(f => f.weighted), 0.4);
+  const barH = 22;
+  const gap = 8;
+  const leftPad = 200;
+  const rightPad = 70;
+  const topPad = 20;
+  const barAreaW = W - leftPad - rightPad;
+
+  // Adjust canvas height if needed
+  const neededH = topPad + allFactors.length * (barH + gap) + 20;
+  if (neededH > H) {
+    canvas.height = neededH;
+  }
+  const CH = canvas.height;
+  ctx.clearRect(0, 0, W, CH);
+
+  // Background
+  ctx.fillStyle = '#fafbfc';
+  ctx.fillRect(0, 0, W, CH);
+
+  // Draw bars
+  allFactors.forEach((f, i) => {
+    const y = topPad + i * (barH + gap);
+    const barW = (f.weighted / maxWS) * barAreaW;
+
+    // Label
+    ctx.fillStyle = '#475569';
+    ctx.font = '500 12px DM Sans, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    const labelText = f.label.length > 24 ? f.label.substring(0, 22) + '...' : f.label;
+    ctx.fillText(labelText, leftPad - 12, y + barH / 2);
+
+    // Bar
+    ctx.fillStyle = f.color;
+    ctx.globalAlpha = 0.85;
+    roundRect(ctx, leftPad, y, barW, barH, 4);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Score label
+    ctx.fillStyle = f.color;
+    ctx.font = '700 11px DM Sans, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(f.weighted.toFixed(2), leftPad + barW + 8, y + barH / 2);
+  });
+
+  // Weight warning overlay on canvas
+  if (Math.abs(r.weightSum - 1.0) >= 0.005) {
+    const warnY = topPad + allFactors.length * (barH + gap) + 8;
+    const warnH = 32;
+
+    // Ensure canvas is tall enough for the warning
+    if (warnY + warnH + 10 > canvas.height) {
+      canvas.height = warnY + warnH + 10;
+      // Redraw background for extended area
+      ctx.fillStyle = '#fafbfc';
+      ctx.fillRect(0, warnY - 2, W, warnH + 12);
+    }
+
+    // Warning background bar
+    ctx.fillStyle = '#fef2f2';
+    ctx.fillRect(leftPad - 10, warnY, barAreaW + rightPad, warnH);
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(leftPad - 10, warnY, barAreaW + rightPad, warnH);
+
+    // Warning text
+    ctx.fillStyle = '#dc2626';
+    ctx.font = 'bold 12px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      '⚠ RESULTS NOT VALID — Weights total ' + r.weightSum.toFixed(2) + ' (must equal 1.00)',
+      leftPad + barAreaW / 2, warnY + warnH / 2
+    );
+  }
+
+  // Score gauge
+  const gaugeEl = document.getElementById('gaugeScore');
+  gaugeEl.textContent = r.totalScore.toFixed(2);
+  if (r.totalScore > 2.5) {
+    gaugeEl.style.color = '#16a34a';
+  } else if (r.totalScore < 2.5) {
+    gaugeEl.style.color = '#dc2626';
+  } else {
+    gaugeEl.style.color = '#f59e0b';
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+/* ── Strategy Card ──────────────────────────────── */
+function buildStrategyCard() {
+  const sc = document.getElementById('strategyCard');
+  const r = results;
+  const score = r.totalScore;
+  let emoji, label, color, tagline, items;
+
+  if (score > 2.5) {
+    emoji = '🚀';
+    label = 'Strong Internal Position';
+    color = '#16a34a';
+    tagline = `${r.company} demonstrates strong internal capabilities with a weighted score of ${score.toFixed(2)}, suggesting its strengths significantly outweigh its weaknesses.`;
+    items = [
+      { icon: '📈', title: 'Leverage Core Strengths', body: 'Use your dominant strengths as a foundation for aggressive growth strategies. Double down on what differentiates you from competitors.' },
+      { icon: '🌍', title: 'Pursue Aggressive Expansion', body: 'Your strong internal position supports entering new markets or geographies. Internal capabilities can absorb the risk of expansion.' },
+      { icon: '💡', title: 'Invest in Product Development', body: 'Allocate resources to R&D and innovation. Your internal strength gives you a runway to invest in next-generation products.' },
+      { icon: '🏪', title: 'Enter New Markets Confidently', body: 'A strong IFE score signals readiness for market development. Explore adjacent markets where your strengths transfer.' },
+      { icon: '🏗️', title: 'Build on Competitive Advantages', body: 'Strengthen and protect the factors that earned high weighted scores. These are your sustainable competitive advantages.' },
+      { icon: '🤝', title: 'Seek Strategic Acquisitions', body: 'Consider acquiring companies that complement your strengths or help neutralize remaining weaknesses.' }
+    ];
+  } else if (score < 2.5) {
+    emoji = '⚠️';
+    label = 'Weak Internal Position';
+    color = '#dc2626';
+    tagline = `${r.company} faces significant internal challenges with a weighted score of ${score.toFixed(2)}, indicating weaknesses outweigh strengths.`;
+    items = [
+      { icon: '🔧', title: 'Immediate Weakness Remediation', body: 'Prioritize fixing the highest-weighted weaknesses first. Develop specific action plans with timelines for each critical weakness.' },
+      { icon: '✂️', title: 'Cost Reduction Program', body: 'Identify and eliminate operational inefficiencies. Redirect savings toward strengthening core capabilities.' },
+      { icon: '🔄', title: 'Restructure Operations', body: 'Consider reorganizing business units, processes, or management structures to better align resources with strategic objectives.' },
+      { icon: '🤝', title: 'Seek Strategic Partnerships', body: 'Partner with organizations whose strengths complement your weaknesses. Joint ventures can provide capabilities you lack internally.' },
+      { icon: '🎯', title: 'Focus on Core Competencies', body: 'Narrow your strategic focus to areas where you have genuine strength. Avoid spreading resources too thin across weak areas.' },
+      { icon: '📦', title: 'Consider Divestiture of Weak Units', body: 'Evaluate whether underperforming business units should be sold or shut down to free resources for stronger areas.' }
+    ];
+  } else {
+    emoji = '⚖️';
+    label = 'Average Internal Position';
+    color = '#f59e0b';
+    tagline = `${r.company} has a balanced internal position with a weighted score of ${score.toFixed(2)}, indicating roughly equal strengths and weaknesses.`;
+    items = [
+      { icon: '🎯', title: 'Selective Investment in Key Strengths', body: 'Identify your top 2-3 strengths and invest disproportionately in them. Converting average to strong requires focused resource allocation.' },
+      { icon: '🔧', title: 'Address Critical Weaknesses', body: 'Focus on the weaknesses with the highest weights first. Even small improvements in heavily weighted areas significantly impact your total score.' },
+      { icon: '🛡️', title: 'Maintain Current Market Position', body: 'Avoid overextending while you shore up internal capabilities. Protect existing market share while building internal strength.' },
+      { icon: '⚙️', title: 'Improve Operational Efficiency', body: 'Look for process improvements, automation, and waste elimination that can strengthen your internal position without major investment.' },
+      { icon: '👁️', title: 'Monitor Competitive Environment', body: 'With an average position, you are vulnerable to competitor moves. Stay alert to industry changes that could shift the balance.' },
+      { icon: '📋', title: 'Develop Contingency Plans', body: 'Prepare response plans for scenarios where key strengths erode or weaknesses worsen. An average position demands preparedness.' }
+    ];
+  }
+
+  sc.innerHTML = `
+    <div class="strategy-header">
+      <div class="icon-big">${emoji}</div>
+      <div>
+        <h3>Strategic Position: ${label}</h3>
+        <p>${tagline}</p>
+      </div>
+    </div>
+    <div class="strategy-grid">
+      ${items.map(s => `
+        <div class="strategy-item">
+          <h4 style="color:${color}">${s.icon} ${s.title}</h4>
+          <p>${s.body}</p>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+/* ── Print Header ───────────────────────────────── */
+function updatePrintHeader() {
+  document.getElementById('print-title').textContent =
+    'IFE Matrix Analysis — ' + results.company;
+  let meta = [];
+  if (results.industry) meta.push(results.industry);
+  if (results.analyst)  meta.push('Analyst: ' + results.analyst);
+  if (results.date)     meta.push(results.date);
+  document.getElementById('print-meta').textContent = meta.join('  |  ');
+}
+
+/* ── Reset All ──────────────────────────────────── */
+function resetAll() {
+  results = {};
+  ['companyName','companyIndustry','analystName','analysisDate']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  buildSections();
+  setStep(1);
+}
+
+/* ── Initialize ─────────────────────────────────── */
+buildSections();
+</script>
+</body>
+</html>

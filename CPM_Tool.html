@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Competitive Profile Matrix Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens ──────────────────────────────── */
+:root {
+  --navy:   #0f2342;
+  --cobalt: #1a3a6e;
+  --sky:    #2563eb;
+  --steel:  #64748b;
+  --cloud:  #f1f5f9;
+  --white:  #ffffff;
+  --accent: #f59e0b;
+  --green:  #10b981;
+  --red:    #ef4444;
+  --orange: #f97316;
+  --text:   #1e293b;
+  --muted:  #94a3b8;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow:    0 4px 24px rgba(15,35,66,0.10);
+  --shadow-lg: 0 12px 48px rgba(15,35,66,0.16);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif; color: var(--text);
+  background: var(--navy);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(37,99,235,0.25) 0%, transparent 60%),
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px);
+  min-height: 100vh; line-height: 1.7;
+}
+.app-shell { max-width: 960px; margin: 0 auto; padding: 40px 20px 80px; }
+
+/* ── App Header ─────────────────────────────────── */
+.app-header { text-align: center; margin-bottom: 48px; }
+.app-header .eyebrow {
+  display: inline-block; background: rgba(37,99,235,0.25); color: #93c5fd;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(147,197,253,0.25); margin-bottom: 20px;
+}
+.app-header h1 { font-family: 'DM Serif Display', serif; font-size: clamp(2.2rem,5vw,3.4rem); color: var(--white); line-height: 1.1; margin-bottom: 14px; }
+.app-header h1 em { font-style: italic; color: #93c5fd; }
+.app-header p { color: #94a3b8; font-size: 1.05rem; max-width: 520px; margin: 0 auto; line-height: 1.7; font-weight: 300; }
+
+/* ── Progress Bar ───────────────────────────────── */
+.progress-bar-wrap { display: flex; align-items: center; margin-bottom: 40px; position: relative; }
+.progress-bar-wrap::before { content:''; position: absolute; top: 18px; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.08); z-index: 0; }
+.progress-bar-fill { position: absolute; top: 18px; left: 0; height: 2px; background: var(--sky); z-index: 1; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+.step-node { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative; z-index: 2; }
+.step-node .bubble { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: var(--muted); transition: all 0.3s ease; }
+.step-node.active .bubble { background: var(--sky); border-color: var(--sky); color: white; box-shadow: 0 0 0 4px rgba(37,99,235,0.25); }
+.step-node.done .bubble { background: var(--green); border-color: var(--green); color: white; }
+.step-node .step-label { font-size: 0.7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; transition: color 0.3s; }
+.step-node.active .step-label { color: #93c5fd; }
+.step-node.done .step-label { color: var(--green); }
+
+/* ── Card ───────────────────────────────────────── */
+.card { background: var(--white); border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; animation: slideUp 0.4s cubic-bezier(0.4,0,0.2,1); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.card-header { background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%); padding: 28px 36px; display: flex; align-items: center; gap: 16px; }
+.card-header h2 { font-family: 'DM Serif Display', serif; color: white; font-size: 1.5rem; }
+.card-header p { color: #94a3b8; font-size: 0.85rem; margin-top: 4px; font-weight: 300; }
+.card-header .icon { width: 48px; height: 48px; background: rgba(255,255,255,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+.card-body { padding: 36px; }
+.step { display: none; } .step.active { display: block; }
+
+/* ── Form ───────────────────────────────────────── */
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--steel); margin-bottom: 8px; }
+input[type="text"], input[type="number"], textarea { width: 100%; padding: 13px 16px; border: 2px solid var(--border); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 1rem; color: var(--text); background: var(--cloud); transition: border-color 0.2s, box-shadow 0.2s; outline: none; }
+input:focus, textarea:focus { border-color: var(--sky); box-shadow: 0 0 0 4px rgba(37,99,235,0.12); background: white; }
+input.error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(239,68,68,0.12); }
+.error-msg { font-size: 0.8rem; color: var(--red); margin-top: 5px; font-weight: 500; display: none; }
+
+/* ── Buttons ────────────────────────────────────── */
+.btn { padding: 13px 28px; border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 700; cursor: pointer; border: 2px solid transparent; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 8px; }
+.btn-primary { background: var(--sky); color: white; box-shadow: 0 4px 16px rgba(37,99,235,0.30); }
+.btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(37,99,235,0.35); }
+.btn-secondary { background: transparent; color: var(--steel); border-color: var(--border); }
+.btn-secondary:hover { background: var(--cloud); color: var(--text); }
+.btn-accent { background: var(--accent); color: white; box-shadow: 0 4px 16px rgba(245,158,11,0.30); }
+.btn-accent:hover { background: #d97706; transform: translateY(-1px); }
+.btn-row { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; margin-top: 28px; }
+.hint-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 20px; margin-bottom: 28px; font-size: 0.85rem; color: #1e40af; line-height: 1.7; }
+
+/* ── Competitor Fields (Step 1) ──────────────────── */
+.competitor-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+.competitor-fields .form-group { margin-bottom: 0; }
+@media (max-width: 580px) { .competitor-fields { grid-template-columns: 1fr; } }
+
+/* ── CPM Table ──────────────────────────────────── */
+.cpm-table-wrap { border: 2px solid var(--border); border-radius: 16px; overflow-x: auto; margin-bottom: 24px; }
+.cpm-table-header { padding: 14px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 2px solid var(--border); background: #f0f4ff; }
+.cpm-table-header .dim-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: var(--sky); }
+.cpm-table-header h3 { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text); }
+.cpm-table-body { padding: 14px 12px; background: var(--cloud); min-width: 600px; }
+
+/* Column headers */
+.cpm-col-headers { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.cpm-col-headers span { font-size: 0.64rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; text-align: center; }
+.cpm-ch-num { width: 16px; flex-shrink: 0; }
+.cpm-ch-csf { flex: 1; text-align: left !important; min-width: 120px; }
+.cpm-ch-wt { width: 58px; flex-shrink: 0; }
+.cpm-ch-rt { width: 44px; flex-shrink: 0; }
+.cpm-ch-ws { width: 50px; flex-shrink: 0; }
+.cpm-ch-del { width: 26px; flex-shrink: 0; }
+
+/* Company color pills in header */
+.co-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.6rem; font-weight: 700; color: white; white-space: nowrap; max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Factor rows */
+.cpm-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; animation: rowIn 0.2s ease; }
+@keyframes rowIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+.cpm-row .row-num { font-size: 0.68rem; font-weight: 700; color: var(--muted); width: 16px; text-align: right; flex-shrink: 0; }
+.cpm-row .csf-input { flex: 1; padding: 6px 8px !important; font-size: 0.78rem !important; background: white !important; border: 1.5px solid var(--border) !important; border-radius: 8px !important; min-width: 120px; }
+.cpm-row .csf-input:focus { border-color: var(--sky) !important; box-shadow: 0 0 0 3px rgba(37,99,235,0.10) !important; }
+.cpm-row .wt-input { width: 58px !important; text-align: center !important; padding: 6px 4px !important; font-size: 0.82rem !important; background: white !important; border: 1.5px solid var(--border) !important; border-radius: 8px !important; flex-shrink: 0; }
+.cpm-row .rt-input { width: 44px !important; text-align: center !important; padding: 6px 4px !important; font-size: 0.82rem !important; background: white !important; border: 1.5px solid var(--border) !important; border-radius: 8px !important; flex-shrink: 0; }
+.cpm-row .ws-display { width: 50px; text-align: center; font-size: 0.78rem; font-weight: 700; color: var(--steel); flex-shrink: 0; }
+.remove-btn { width: 26px; height: 26px; border-radius: 6px; border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s; flex-shrink: 0; }
+.remove-btn:hover { background: #fee2e2; color: var(--red); }
+.remove-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+.cpm-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; gap: 10px; flex-wrap: wrap; }
+.add-btn { display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 700; color: var(--sky); background: rgba(37,99,235,0.08); border: 1.5px dashed rgba(37,99,235,0.3); border-radius: 8px; padding: 6px 12px; cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+.add-btn:hover { background: rgba(37,99,235,0.15); border-color: var(--sky); }
+.add-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Weight total */
+.weight-total-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: var(--white); border-top: 2px solid var(--border); min-width: 600px; }
+.weight-total-bar .wt-label { font-size: 0.82rem; font-weight: 700; color: var(--steel); text-transform: uppercase; letter-spacing: 0.06em; }
+.weight-total-bar .wt-value { font-size: 1rem; font-weight: 700; }
+.wt-warn { color: var(--orange); } .wt-ok { color: var(--green); }
+
+#form-error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; color: #dc2626; font-size: 0.85rem; font-weight: 500; }
+
+/* ── Results ────────────────────────────────────── */
+.score-summary { background: white; border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px; }
+.score-table { width: 100%; border-collapse: collapse; }
+.score-table th { background: var(--cloud); padding: 12px 16px; text-align: left; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--steel); border-bottom: 2px solid var(--border); }
+.score-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+.score-table tr:last-child td { border-bottom: none; }
+.score-chip { display: inline-flex; align-items: center; justify-content: center; padding: 3px 10px; border-radius: 6px; font-size: 0.82rem; font-weight: 700; }
+.coord-row { background: var(--navy); }
+.coord-row td { border-bottom: none !important; padding: 14px 16px; color: white; font-weight: 700; }
+
+/* Rankings */
+.rankings-wrap { background: white; border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px; }
+.rankings-header { padding: 18px 24px; border-bottom: 2px solid var(--border); }
+.rankings-header h3 { font-family: 'DM Serif Display', serif; font-size: 1.15rem; color: var(--text); }
+.rank-row { display: flex; align-items: center; padding: 14px 24px; border-bottom: 1px solid var(--border); gap: 16px; }
+.rank-row:last-child { border-bottom: none; }
+.rank-num { font-family: 'DM Serif Display', serif; font-size: 1.4rem; width: 36px; text-align: center; flex-shrink: 0; }
+.rank-bar-wrap { flex: 1; }
+.rank-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.rank-bar { height: 10px; border-radius: 5px; transition: width 0.5s ease; }
+.rank-score { font-weight: 700; font-size: 0.88rem; width: 50px; text-align: right; flex-shrink: 0; }
+.leader-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.68rem; font-weight: 700; background: #fef3c7; color: #b45309; text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* Chart */
+.chart-wrap { background: white; border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; margin-bottom: 28px; }
+.chart-topbar { background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%); padding: 20px 28px; display: flex; align-items: center; gap: 12px; }
+.chart-topbar h3 { font-family: 'DM Serif Display', serif; color: white; font-size: 1.15rem; }
+.chart-topbar .chart-icon { width: 40px; height: 40px; background: rgba(255,255,255,0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+.chart-body { padding: 24px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; justify-content: center; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; color: var(--steel); }
+.legend-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+canvas#cpmCanvas { display: block; width: 100%; max-width: 700px; margin: 0 auto; }
+
+/* Strategy Card */
+.strategy-card { background: white; border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px; }
+.strategy-header { padding: 24px 28px 20px; border-bottom: 2px solid var(--border); display: flex; align-items: flex-start; gap: 16px; }
+.strategy-header .icon-big { font-size: 2rem; line-height: 1; }
+.strategy-header h3 { font-family: 'DM Serif Display', serif; font-size: 1.3rem; color: var(--text); margin-bottom: 4px; }
+.strategy-header p { color: var(--steel); font-size: 0.88rem; line-height: 1.6; }
+.strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.strategy-item { padding: 20px 24px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); transition: background 0.15s; }
+.strategy-item:hover { background: var(--cloud); }
+.strategy-item:nth-child(even) { border-right: none; }
+.strategy-item:nth-last-child(-n+2) { border-bottom: none; }
+.strategy-item h4 { font-size: 0.88rem; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.strategy-item p { font-size: 0.82rem; color: var(--steel); line-height: 1.6; }
+
+/* ── Print Validation Alert ─────────────────────── */
+.print-alert {
+  background: #fef2f2;
+  border: 2px solid #fca5a5;
+  border-radius: 12px;
+  padding: 16px 24px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.print-alert p {
+  color: #dc2626;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* Print */
+.print-only { display: none; }
+@media print {
+  body { background: white !important; color: black; }
+  @page { margin: 1.5cm; }
+  .app-header, .progress-bar-wrap, .no-print, #step1, #step2 { display: none !important; }
+  .print-only { display: block !important; }
+  #step3 { display: block !important; }
+  .card, .chart-wrap, .score-summary, .strategy-card, .rankings-wrap { box-shadow: none !important; border: 1px solid #ddd; }
+  .card-header, .chart-topbar { background: #1a3a6e !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .app-shell { padding: 0; max-width: 100%; }
+  canvas { max-width: 500px; margin: 0 auto; display: block; }
+  .strategy-item { break-inside: avoid; } .score-summary { break-inside: avoid; } .chart-wrap { break-inside: avoid; }
+  .strategy-grid { grid-template-columns: 1fr 1fr; }
+  .print-header { text-align: center; padding: 20px 0 30px; border-bottom: 3px solid #1a3a6e; margin-bottom: 24px; }
+  .print-header h1 { font-size: 1.8rem; color: #1a3a6e; font-family: 'DM Serif Display', serif; }
+  .print-header p { color: #666; font-size: 0.9rem; margin-top: 6px; }
+  /* ── Validation alert (weight errors) ─────────── */
+  .print-alert {
+    background: #fef2f2 !important;
+    border: 3px solid #dc2626 !important;
+    border-radius: 0 !important;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-alert p {
+    color: #dc2626 !important;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+}
+@media (max-width: 620px) { .strategy-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <div class="app-header no-print">
+    <div class="eyebrow">Strategic Management Tool</div>
+    <h1>Competitive Profile <em>Matrix</em></h1>
+    <p>Benchmark your company against competitors on Critical Success Factors to reveal competitive strengths and gaps.</p>
+  </div>
+
+  <div class="progress-bar-wrap no-print" id="progressBar">
+    <div class="progress-bar-fill" id="progressFill" style="width:16%"></div>
+    <div class="step-node active" id="node1"><div class="bubble">1</div><span class="step-label">Companies</span></div>
+    <div class="step-node" id="node2"><div class="bubble">2</div><span class="step-label">Factors</span></div>
+    <div class="step-node" id="node3"><div class="bubble">3</div><span class="step-label">Results</span></div>
+  </div>
+
+  <!-- ═══════════ STEP 1 ═══════════ -->
+  <div class="step active" id="step1">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">🏢</div>
+        <div><h2>Company &amp; Competitors</h2><p>Identify your company and the competitors to compare</p></div>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="companyName">Your Company Name *</label>
+          <input type="text" id="companyName" placeholder="e.g. Apple Inc." aria-label="Company Name">
+          <div class="error-msg" id="err-company">Please enter a company name to continue.</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>Competitor Names (at least 1 required, up to 4)</label>
+        </div>
+        <div class="competitor-fields" id="competitorFields">
+          <div class="form-group"><input type="text" id="comp2" placeholder="Competitor 2" aria-label="Competitor 2 name"></div>
+          <div class="form-group"><input type="text" id="comp3" placeholder="Competitor 3 (optional)" aria-label="Competitor 3 name"></div>
+          <div class="form-group"><input type="text" id="comp4" placeholder="Competitor 4 (optional)" aria-label="Competitor 4 name"></div>
+          <div class="form-group"><input type="text" id="comp5" placeholder="Competitor 5 (optional)" aria-label="Competitor 5 name"></div>
+        </div>
+
+        <div class="form-group">
+          <label for="companyIndustry">Industry / Sector</label>
+          <input type="text" id="companyIndustry" placeholder="e.g. Consumer Electronics" aria-label="Industry or Sector">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div class="form-group"><label for="analystName">Analyst Name</label><input type="text" id="analystName" placeholder="e.g. Jane Smith" aria-label="Analyst Name"></div>
+          <div class="form-group"><label for="analysisDate">Date</label><input type="text" id="analysisDate" placeholder="" aria-label="Analysis Date"></div>
+        </div>
+
+        <div class="hint-box">
+          <strong>How the CPM works:</strong><br>
+          You will identify <strong>Critical Success Factors</strong> (CSFs) for the industry, assign each a <strong>weight</strong> (0.00–1.00, summing to 1.00), then <strong>rate</strong> each company on every CSF from <strong>1</strong> (major weakness) to <strong>4</strong> (major strength). The total weighted score reveals each company's overall competitive position.
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnToStep2">Continue to Factors &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 2 ═══════════ -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">📊</div>
+        <div><h2>Critical Success Factors</h2><p>Weight CSFs and rate each company</p></div>
+      </div>
+      <div class="card-body">
+        <div class="hint-box">
+          <strong>📘 How to use this tool:</strong><br>
+          &bull; <strong>Weight</strong> each CSF from 0.00 to 1.00 based on importance to industry success. All weights must sum to <strong>1.00</strong>.<br>
+          &bull; <strong>Rate</strong> each company per CSF: <strong>4</strong> = major strength, <strong>3</strong> = minor strength, <strong>2</strong> = minor weakness, <strong>1</strong> = major weakness.<br>
+          &bull; Weighted Score = Weight &times; Rating. The total for each company indicates its competitive position.<br>
+          &bull; You can edit CSF names, add rows (up to 10), or remove rows.
+        </div>
+
+        <div class="cpm-table-wrap" id="cpmTableWrap">
+          <div class="cpm-table-header">
+            <div class="dim-dot"></div>
+            <h3>CSF Comparison Table</h3>
+          </div>
+          <div class="cpm-table-body" id="cpmTableBody">
+            <div class="cpm-col-headers" id="colHeaderRow"></div>
+            <div id="csfList"></div>
+            <div class="cpm-footer">
+              <button class="add-btn" id="addCsfBtn" onclick="addCsfRow()">
+                <span style="font-size:1.1rem;line-height:1">+</span> Add CSF
+              </button>
+            </div>
+          </div>
+          <div class="weight-total-bar" id="weightBar">
+            <div><span class="wt-label">Total Weight: </span><span class="wt-value" id="weightTotalDisplay">0.00 / 1.00</span></div>
+          </div>
+        </div>
+
+        <div id="form-error" style="display:none;"></div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="goToStep1()">&larr; Back</button>
+          <button class="btn btn-primary" onclick="generateResults()">Generate Results &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 3 ═══════════ -->
+  <div class="step" id="step3">
+    <div class="print-only print-header">
+      <h1 id="print-title">Competitive Profile Matrix</h1>
+      <p id="print-meta"></p>
+    </div>
+
+    <!-- Print Validation Alert -->
+    <div class="print-alert" id="printValidationAlert" style="display:none;">
+      <p id="printAlertText"></p>
+    </div>
+
+    <!-- Rankings -->
+    <div class="rankings-wrap" id="rankingsWrap"></div>
+
+    <!-- Score Table -->
+    <div class="score-summary" id="scoreSummary"></div>
+
+    <!-- Chart -->
+    <div class="chart-wrap">
+      <div class="chart-topbar">
+        <div class="chart-icon">📊</div>
+        <h3>Weighted Score by CSF</h3>
+      </div>
+      <div class="chart-body">
+        <div class="chart-legend" id="chartLegend"></div>
+        <canvas id="cpmCanvas" width="700" height="450"></canvas>
+      </div>
+    </div>
+
+    <!-- Strategy Card -->
+    <div class="strategy-card" id="strategyCard"></div>
+
+    <div class="btn-row no-print">
+      <button class="btn btn-secondary" onclick="goToStep2()">&larr; Edit Scores</button>
+      <button class="btn btn-secondary" onclick="resetAll()">↺ Start Over</button>
+      <button class="btn btn-accent" onclick="window.print()">🖨️ Print / Save PDF</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   Competitive Profile Matrix Tool — JavaScript
+   ═══════════════════════════════════════════════════════ */
+
+const MAX_CSF = 10, MIN_CSF = 1;
+const CO_COLORS = ['#2563eb','#7c3aed','#16a34a','#ea580c','#dc2626'];
+const DEFAULT_CSFS = [
+  'Advertising','Customer Loyalty','Financial Position','Global Expansion',
+  'Market Share','Price Competitiveness','Product Quality',
+  'Management Experience','Production Capacity','Technology Innovation'
+];
+
+let companies = [];
+let results = {};
+
+/* ── Date ───────────────────────────────────────── */
+(function() {
+  const now = new Date();
+  const m = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('analysisDate').value = m[now.getMonth()] + ' ' + now.getFullYear();
+})();
+
+/* ── Navigation ─────────────────────────────────── */
+function setStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  for (let i = 1; i <= 3; i++) {
+    const node = document.getElementById('node' + i);
+    node.classList.remove('active','done');
+    if (i < n) node.classList.add('done');
+    else if (i === n) node.classList.add('active');
+  }
+  document.getElementById('progressFill').style.width = (n === 1 ? 16 : n === 2 ? 50 : 92) + '%';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function goToStep1() { setStep(1); }
+function goToStep2() { setStep(2); }
+
+/* ── Step 1 Validation ──────────────────────────── */
+document.getElementById('btnToStep2').onclick = function() {
+  const name = document.getElementById('companyName').value.trim();
+  const err = document.getElementById('err-company');
+  if (!name) { document.getElementById('companyName').classList.add('error'); err.style.display = 'block'; return; }
+  document.getElementById('companyName').classList.remove('error'); err.style.display = 'none';
+
+  // Gather companies
+  companies = [{ name, idx: 0 }];
+  ['comp2','comp3','comp4','comp5'].forEach((id, i) => {
+    const v = document.getElementById(id).value.trim();
+    if (v) companies.push({ name: v, idx: i + 1 });
+  });
+  if (companies.length < 2) {
+    alert('Please enter at least one competitor name.');
+    return;
+  }
+
+  buildCpmTable();
+  setStep(2);
+};
+
+/* ── Build CPM Table ────────────────────────────── */
+function buildCpmTable() {
+  // Column headers
+  const hdr = document.getElementById('colHeaderRow');
+  let hdrHtml = '<span class="cpm-ch-num"></span><span class="cpm-ch-csf">CSF <span style="font-weight:400;opacity:0.7">(editable)</span></span><span class="cpm-ch-wt">Weight</span>';
+  companies.forEach((c, i) => {
+    const color = CO_COLORS[i];
+    const short = c.name.length > 10 ? c.name.substring(0, 9) + '..' : c.name;
+    hdrHtml += `<span class="cpm-ch-rt"><span class="co-pill" style="background:${color}" title="${c.name}">${short}</span></span><span class="cpm-ch-ws">W.S</span>`;
+  });
+  hdrHtml += '<span class="cpm-ch-del"></span>';
+  hdr.innerHTML = hdrHtml;
+
+  // CSF rows
+  const list = document.getElementById('csfList');
+  list.innerHTML = '';
+  DEFAULT_CSFS.slice(0, 4).forEach(label => addCsfRow(label));
+}
+
+function addCsfRow(labelText) {
+  const list = document.getElementById('csfList');
+  if (list.querySelectorAll('.cpm-row').length >= MAX_CSF) return;
+
+  const row = document.createElement('div');
+  row.className = 'cpm-row';
+
+  const num = document.createElement('span');
+  num.className = 'row-num';
+  num.textContent = list.querySelectorAll('.cpm-row').length + 1;
+
+  const csfIn = document.createElement('input');
+  csfIn.type = 'text'; csfIn.className = 'csf-input';
+  csfIn.placeholder = 'CSF name...'; csfIn.value = labelText || '';
+  csfIn.maxLength = 40; csfIn.setAttribute('aria-label', 'Critical success factor name');
+
+  const wtIn = document.createElement('input');
+  wtIn.type = 'number'; wtIn.className = 'wt-input';
+  wtIn.min = 0; wtIn.max = 1; wtIn.step = 0.01; wtIn.placeholder = '0.00';
+  wtIn.setAttribute('aria-label', 'CSF weight');
+  wtIn.addEventListener('input', updateLive);
+
+  row.append(num, csfIn, wtIn);
+
+  // Rating + WS columns per company
+  companies.forEach((c, i) => {
+    const rtIn = document.createElement('input');
+    rtIn.type = 'number'; rtIn.className = 'rt-input'; rtIn.dataset.co = i;
+    rtIn.min = 1; rtIn.max = 4; rtIn.step = 1; rtIn.placeholder = '1-4';
+    rtIn.setAttribute('aria-label', c.name + ' rating');
+    rtIn.addEventListener('input', function() {
+      const v = parseInt(this.value);
+      if (this.value !== '' && (isNaN(v) || v < 1 || v > 4)) this.classList.add('error');
+      else this.classList.remove('error');
+      updateLive();
+    });
+    const wsDisp = document.createElement('span');
+    wsDisp.className = 'ws-display'; wsDisp.dataset.co = i;
+    wsDisp.textContent = '—';
+    row.append(rtIn, wsDisp);
+  });
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'remove-btn'; delBtn.title = 'Remove CSF';
+  delBtn.innerHTML = '✕';
+  delBtn.onclick = () => removeCsfRow(row);
+  row.appendChild(delBtn);
+
+  list.appendChild(row);
+  updateRowNums(); updateAddBtn(); updateLive();
+  if (!labelText) csfIn.focus();
+}
+
+function removeCsfRow(rowEl) {
+  const list = document.getElementById('csfList');
+  if (list.querySelectorAll('.cpm-row').length <= MIN_CSF) return;
+  rowEl.style.cssText = 'opacity:0;transform:translateX(8px);transition:opacity 0.18s,transform 0.18s;';
+  setTimeout(() => { rowEl.remove(); updateRowNums(); updateAddBtn(); updateLive(); }, 190);
+}
+
+function updateRowNums() {
+  const rows = document.querySelectorAll('#csfList .cpm-row');
+  rows.forEach((r, i) => { r.querySelector('.row-num').textContent = i + 1; r.querySelector('.remove-btn').disabled = (rows.length <= MIN_CSF); });
+}
+function updateAddBtn() {
+  const btn = document.getElementById('addCsfBtn');
+  if (btn) btn.disabled = document.getElementById('csfList').querySelectorAll('.cpm-row').length >= MAX_CSF;
+}
+
+/* ── Live Updates ───────────────────────────────── */
+function updateLive() {
+  let totalW = 0;
+  document.querySelectorAll('#csfList .cpm-row').forEach(row => {
+    const w = parseFloat(row.querySelector('.wt-input').value);
+    if (!isNaN(w)) totalW += w;
+    companies.forEach((c, i) => {
+      const rt = parseFloat(row.querySelector(`.rt-input[data-co="${i}"]`).value);
+      const disp = row.querySelector(`.ws-display[data-co="${i}"]`);
+      if (!isNaN(w) && !isNaN(rt)) { disp.textContent = (w * rt).toFixed(2); disp.style.color = CO_COLORS[i]; }
+      else { disp.textContent = '—'; disp.style.color = 'var(--steel)'; }
+    });
+  });
+  const wtD = document.getElementById('weightTotalDisplay');
+  wtD.textContent = totalW.toFixed(2) + ' / 1.00';
+  wtD.className = 'wt-value ' + (Math.abs(totalW - 1.0) < 0.005 ? 'wt-ok' : 'wt-warn');
+}
+
+/* ── Generate Results ───────────────────────────── */
+function generateResults() {
+  const errBox = document.getElementById('form-error');
+  errBox.style.display = 'none';
+  const errors = [];
+  const warnings = [];
+
+  // Gather CSF data
+  const rows = document.querySelectorAll('#csfList .cpm-row');
+  const csfs = [];
+  let totalW = 0;
+  rows.forEach((row, ri) => {
+    const label = row.querySelector('.csf-input').value.trim() || 'CSF ' + (ri + 1);
+    const w = parseFloat(row.querySelector('.wt-input').value);
+    if (isNaN(w)) return;
+    totalW += w;
+    const ratings = {};
+    let allValid = true;
+    companies.forEach((c, i) => {
+      const rt = parseFloat(row.querySelector(`.rt-input[data-co="${i}"]`).value);
+      if (isNaN(rt) || rt < 1 || rt > 4) allValid = false;
+      else ratings[i] = rt;
+    });
+    if (allValid && Object.keys(ratings).length === companies.length) {
+      csfs.push({ label, weight: w, ratings });
+    }
+  });
+
+  if (csfs.length < 1) errors.push('Enter at least 1 complete CSF (weight + ratings for all companies).');
+  if (csfs.length < 3 && csfs.length >= 1) warnings.push('Fewer than 3 CSFs — results may lack nuance. Consider adding more factors.');
+
+  // Rating validation
+  let ratingErr = false;
+  rows.forEach(row => {
+    companies.forEach((c, i) => {
+      const v = parseInt(row.querySelector(`.rt-input[data-co="${i}"]`).value);
+      if (row.querySelector(`.rt-input[data-co="${i}"]`).value !== '' && (isNaN(v) || v < 1 || v > 4)) ratingErr = true;
+    });
+  });
+  if (ratingErr) errors.push('All ratings must be between 1 and 4.');
+
+  if (errors.length) { errBox.innerHTML = errors.join('<br>'); errBox.style.display = 'block'; return; }
+
+  // Calculate totals per company
+  const companyScores = companies.map((c, i) => {
+    const total = csfs.reduce((sum, f) => sum + f.weight * f.ratings[i], 0);
+    return { ...c, total, color: CO_COLORS[i] };
+  });
+
+  results = {
+    company: companies[0].name,
+    industry: document.getElementById('companyIndustry').value.trim(),
+    analyst: document.getElementById('analystName').value.trim(),
+    date: document.getElementById('analysisDate').value.trim(),
+    companies: companyScores,
+    csfs, totalWeight: totalW, warnings
+  };
+
+  // Show/hide the print validation alert
+  const alertDiv = document.getElementById('printValidationAlert');
+  const alertText = document.getElementById('printAlertText');
+  if (Math.abs(totalW - 1.0) >= 0.005) {
+    alertText.textContent =
+      '\u26A0 RESULTS NOT VALID \u2014 Total weight is ' + totalW.toFixed(2) +
+      '. Weights must sum to 1.00 for results to be accurate.';
+    alertDiv.style.display = 'block';
+  } else {
+    alertDiv.style.display = 'none';
+  }
+
+  buildRankings();
+  buildScoreTable();
+  drawChart();
+  buildStrategyCard();
+  updatePrintHeader();
+  setStep(3);
+}
+
+/* ── Rankings ───────────────────────────────────── */
+function buildRankings() {
+  const wrap = document.getElementById('rankingsWrap');
+  const sorted = [...results.companies].sort((a, b) => b.total - a.total);
+  const maxScore = sorted[0].total;
+  wrap.innerHTML = `
+    <div class="rankings-header"><h3>Competitive Rankings</h3></div>
+    ${sorted.map((c, i) => `
+      <div class="rank-row">
+        <div class="rank-num" style="color:${c.color}">${i + 1}</div>
+        <div class="rank-bar-wrap">
+          <div class="rank-name">
+            <span style="color:${c.color}">${c.name}</span>
+            ${i === 0 ? '<span class="leader-badge">👑 Leader</span>' : ''}
+            ${c.idx === 0 ? '<span style="font-size:0.68rem;color:var(--muted);font-weight:500;">(Your Company)</span>' : ''}
+          </div>
+          <div class="rank-bar" style="width:${(c.total / maxScore * 100).toFixed(1)}%;background:${c.color};"></div>
+        </div>
+        <div class="rank-score" style="color:${c.color}">${c.total.toFixed(2)}</div>
+      </div>
+    `).join('')}
+  `;
+}
+
+/* ── Score Table ────────────────────────────────── */
+function buildScoreTable() {
+  const r = results;
+  const wrap = document.getElementById('scoreSummary');
+  let weightWarning = '';
+  if (Math.abs(r.totalWeight - 1.0) >= 0.005) {
+    weightWarning = `<tr><td colspan="${2 + r.companies.length * 2}" style="background:#fffbeb;color:#b45309;font-size:0.82rem;font-weight:600;padding:10px 16px;">
+      ⚠ Total weight is ${r.totalWeight.toFixed(2)} — it should equal 1.00 for accurate results.</td></tr>`;
+  }
+  let warnRow = '';
+  if (r.warnings.length) {
+    warnRow = `<tr><td colspan="${2 + r.companies.length * 2}" style="background:#fffbeb;color:#b45309;font-size:0.82rem;font-weight:600;padding:10px 16px;">
+      ⚠ ${r.warnings.join(' ')}</td></tr>`;
+  }
+
+  wrap.innerHTML = `<table class="score-table">
+    <thead><tr>
+      <th>Critical Success Factor</th><th>Weight</th>
+      ${r.companies.map(c => `<th style="color:${c.color}">${c.name}<br><span style="font-weight:400;font-size:0.6rem;">Rt | W.S</span></th>`).join('')}
+    </tr></thead>
+    <tbody>
+      ${r.csfs.map(f => `<tr>
+        <td><strong>${f.label}</strong></td>
+        <td>${f.weight.toFixed(2)}</td>
+        ${r.companies.map((c, i) => {
+          const rt = f.ratings[i];
+          const ws = (f.weight * rt).toFixed(2);
+          return `<td><span style="color:var(--muted)">${rt}</span> &nbsp; <strong style="color:${c.color}">${ws}</strong></td>`;
+        }).join('')}
+      </tr>`).join('')}
+      ${weightWarning}${warnRow}
+    </tbody>
+    <tbody><tr class="coord-row">
+      <td colspan="2"><strong>Total Weighted Score</strong></td>
+      ${r.companies.map(c => `<td style="color:#93c5fd;font-family:'DM Serif Display',serif;font-size:1.15rem;">${c.total.toFixed(2)}</td>`).join('')}
+    </tr></tbody>
+  </table>`;
+}
+
+/* ── Chart ──────────────────────────────────────── */
+function drawChart() {
+  const canvas = document.getElementById('cpmCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 700, H = 450;
+  const r = results;
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 20, right: 30, bottom: 80, left: 50 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+  const nCSF = r.csfs.length;
+  const nCo = r.companies.length;
+  const groupW = cw / nCSF;
+  const barW = Math.min(groupW / (nCo + 1), 28);
+  const maxWS = Math.max(...r.csfs.flatMap(f => r.companies.map((c, i) => f.weight * f.ratings[i])), 0.5);
+
+  // Background
+  ctx.fillStyle = '#fafbfc'; ctx.fillRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.top + ch - (i / 5) * ch;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    ctx.fillStyle = '#94a3b8'; ctx.font = '10px DM Sans, sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText((maxWS * i / 5).toFixed(2), pad.left - 6, y + 3);
+  }
+
+  // Bars
+  r.csfs.forEach((f, fi) => {
+    const gx = pad.left + fi * groupW + groupW / 2;
+    r.companies.forEach((c, ci) => {
+      const ws = f.weight * f.ratings[ci];
+      const barH = (ws / maxWS) * ch;
+      const bx = gx - (nCo * barW) / 2 + ci * barW;
+      const by = pad.top + ch - barH;
+
+      ctx.fillStyle = c.color + 'cc';
+      roundRect(ctx, bx, by, barW - 2, barH, 3);
+      ctx.fill();
+
+      // Value on top
+      if (barH > 14) {
+        ctx.fillStyle = c.color; ctx.font = 'bold 9px DM Sans, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(ws.toFixed(2), bx + (barW - 2) / 2, by - 4);
+      }
+    });
+
+    // CSF label
+    ctx.fillStyle = '#475569'; ctx.font = '500 10px DM Sans, sans-serif'; ctx.textAlign = 'center';
+    const short = f.label.length > 14 ? f.label.substring(0, 12) + '..' : f.label;
+    ctx.save(); ctx.translate(gx, pad.top + ch + 12); ctx.rotate(Math.PI / 6);
+    ctx.textAlign = 'left'; ctx.fillText(short, 0, 0); ctx.restore();
+  });
+
+  // Weight warning overlay on canvas
+  if (Math.abs(r.totalWeight - 1.0) >= 0.005) {
+    const warnY = H - 18;
+    const warnH = 32;
+    canvas.height = H + warnH + 10;
+    ctx.fillStyle = '#fafbfc';
+    ctx.fillRect(0, H, W, warnH + 10);
+    ctx.fillStyle = '#fef2f2';
+    ctx.fillRect(pad.left, warnY, cw, warnH);
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(pad.left, warnY, cw, warnH);
+    ctx.fillStyle = '#dc2626';
+    ctx.font = 'bold 12px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      '\u26A0 RESULTS NOT VALID \u2014 Weights total ' + r.totalWeight.toFixed(2) + ' (must equal 1.00)',
+      pad.left + cw / 2, warnY + warnH / 2
+    );
+  }
+
+  // Legend
+  const legend = document.getElementById('chartLegend');
+  legend.innerHTML = r.companies.map(c =>
+    `<div class="legend-item"><div class="legend-dot" style="background:${c.color}"></div>${c.name}</div>`
+  ).join('');
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+}
+
+/* ── Strategy Card ──────────────────────────────── */
+function buildStrategyCard() {
+  const sc = document.getElementById('strategyCard');
+  const r = results;
+  const sorted = [...r.companies].sort((a, b) => b.total - a.total);
+  const myRank = sorted.findIndex(c => c.idx === 0) + 1;
+  const total = sorted.length;
+  const myScore = r.companies[0].total;
+  const leader = sorted[0];
+  let emoji, label, color, tagline, items;
+
+  if (myRank === 1) {
+    emoji = '👑'; label = 'Competitive Leader'; color = '#16a34a';
+    tagline = `${r.company} leads the competitive field with a total score of ${myScore.toFixed(2)}, outperforming ${total - 1} competitor${total - 1 > 1 ? 's' : ''} on the selected critical success factors.`;
+    items = [
+      { icon: '🛡️', title: 'Defend Market Leadership', body: 'Protect your leading position by continuously monitoring competitor moves and maintaining the factors that drive your advantage.' },
+      { icon: '📈', title: 'Invest in Top-Scoring CSFs', body: 'Double down on the CSFs where you score highest. Widening the gap on your strongest factors makes your lead more durable.' },
+      { icon: '👁️', title: 'Monitor Closest Competitor', body: `Keep a close watch on ${sorted.length > 1 ? sorted[1].name : 'your nearest rival'} (scored ${sorted.length > 1 ? sorted[1].total.toFixed(2) : '—'}). Small gains by the runner-up can erode your lead quickly.` },
+      { icon: '🎯', title: 'Attract Competitor Customers', body: 'Use your strength gaps to pull customers from weaker competitors. Highlight the CSFs where you outperform in your marketing.' },
+      { icon: '💡', title: 'Innovate Where Lead Is Narrowest', body: 'Identify CSFs where your lead is slimmest and invest in innovation there. These are the areas most vulnerable to competitive attack.' },
+      { icon: '🤝', title: 'Consider Acquiring Weaker Rivals', body: 'If feasible, acquiring weaker competitors can consolidate market share and eliminate competitive threats simultaneously.' }
+    ];
+  } else if (myRank === total) {
+    emoji = '⚠️'; label = 'Weakest Competitive Position'; color = '#dc2626';
+    tagline = `${r.company} trails competitors with a score of ${myScore.toFixed(2)}, indicating significant competitive disadvantages across key success factors.`;
+    items = [
+      { icon: '🔧', title: 'Urgent CSF Improvement', body: 'Identify the CSFs with the widest gap between your rating and the leader\'s. Prioritize improving these first for maximum impact.' },
+      { icon: '🎯', title: 'Niche Focus on Comparable CSFs', body: 'Find CSFs where you perform comparably to competitors and build a niche strategy around those specific strengths.' },
+      { icon: '✂️', title: 'Cost Leadership Alternative', body: 'If you cannot win on quality CSFs, consider competing on price. Cost leadership can be effective when differentiation is difficult.' },
+      { icon: '🤝', title: 'Partnership with Stronger Firms', body: 'Form strategic alliances with companies that are strong where you are weak. Partnerships can provide capabilities you cannot build alone.' },
+      { icon: '🔄', title: 'Market Repositioning', body: 'Consider repositioning in a market segment where current CSF weights differ. Your strengths may be more valued in an adjacent segment.' },
+      { icon: '💡', title: 'Develop New CSFs', body: 'Identify emerging success factors where competition is weaker. Innovation in underserved CSFs can reshape the competitive landscape.' }
+    ];
+  } else {
+    emoji = '⚔️'; label = 'Mid-Pack Competitor'; color = '#2563eb';
+    tagline = `${r.company} holds a competitive score of ${myScore.toFixed(2)}, ranking ${myRank} among ${total} companies analyzed.`;
+    items = [
+      { icon: '📈', title: 'Close Gap on Leader\'s Best CSFs', body: `${leader.name} leads with ${leader.total.toFixed(2)}. Study which CSFs drive their lead and invest in closing those specific gaps.` },
+      { icon: '💪', title: 'Leverage Your Strongest CSFs', body: 'Identify CSFs where you outperform at least some competitors. Build your competitive messaging around these relative strengths.' },
+      { icon: '🎯', title: 'Differentiate on Underserved CSFs', body: 'Look for CSFs that are important to customers but poorly served by competitors. Excelling here creates a unique position.' },
+      { icon: '🏪', title: 'Target Favorable Segments', body: 'Focus on market segments where your CSF strengths align with customer priorities. Not all segments weight CSFs equally.' },
+      { icon: '🛡️', title: 'Avoid Direct Leader Confrontation', body: `Don't challenge ${leader.name} head-on where they are strongest. Find flanking strategies that exploit their relative weaknesses.` },
+      { icon: '🤝', title: 'Build Compensating Alliances', body: 'Partner with organizations whose CSF strengths complement your weak areas. Alliances can help bridge competitive gaps.' }
+    ];
+  }
+
+  sc.innerHTML = `
+    <div class="strategy-header">
+      <div class="icon-big">${emoji}</div>
+      <div><h3>Competitive Position: ${label}</h3><p>${tagline}</p></div>
+    </div>
+    <div class="strategy-grid">
+      ${items.map(s => `<div class="strategy-item"><h4 style="color:${color}">${s.icon} ${s.title}</h4><p>${s.body}</p></div>`).join('')}
+    </div>
+  `;
+}
+
+/* ── Print Header ───────────────────────────────── */
+function updatePrintHeader() {
+  document.getElementById('print-title').textContent = 'Competitive Profile Matrix — ' + results.company;
+  let meta = [];
+  if (results.industry) meta.push(results.industry);
+  if (results.analyst) meta.push('Analyst: ' + results.analyst);
+  if (results.date) meta.push(results.date);
+  document.getElementById('print-meta').textContent = meta.join('  |  ');
+}
+
+/* ── Reset ──────────────────────────────────────── */
+function resetAll() {
+  results = {}; companies = [];
+  ['companyName','companyIndustry','analystName','analysisDate','comp2','comp3','comp4','comp5']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('csfList').innerHTML = '';
+  document.getElementById('colHeaderRow').innerHTML = '';
+  setStep(1);
+}
+
+</script>
+</body>
+</html>

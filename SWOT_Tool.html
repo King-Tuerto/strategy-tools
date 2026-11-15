@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWOT Analysis Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens ──────────────────────────────── */
+:root {
+  --navy:   #0f2342;
+  --cobalt: #1a3a6e;
+  --sky:    #2563eb;
+  --steel:  #64748b;
+  --cloud:  #f1f5f9;
+  --white:  #ffffff;
+  --accent: #f59e0b;
+  --green:  #10b981;
+  --red:    #ef4444;
+  --orange: #f97316;
+  --text:   #1e293b;
+  --muted:  #94a3b8;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow:    0 4px 24px rgba(15,35,66,0.10);
+  --shadow-lg: 0 12px 48px rgba(15,35,66,0.16);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif; color: var(--text);
+  background: var(--navy);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(37,99,235,0.25) 0%, transparent 60%),
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px);
+  min-height: 100vh; line-height: 1.7;
+}
+.app-shell { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; }
+
+/* ── App Header ─────────────────────────────────── */
+.app-header { text-align: center; margin-bottom: 48px; }
+.app-header .eyebrow {
+  display: inline-block; background: rgba(37,99,235,0.25); color: #93c5fd;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(147,197,253,0.25); margin-bottom: 20px;
+}
+.app-header h1 { font-family: 'DM Serif Display', serif; font-size: clamp(2.2rem,5vw,3.4rem); color: var(--white); line-height: 1.1; margin-bottom: 14px; }
+.app-header h1 em { font-style: italic; color: #93c5fd; }
+.app-header p { color: #94a3b8; font-size: 1.05rem; max-width: 520px; margin: 0 auto; line-height: 1.7; font-weight: 300; }
+
+/* ── Progress Bar ───────────────────────────────── */
+.progress-bar-wrap { display: flex; align-items: center; margin-bottom: 40px; position: relative; }
+.progress-bar-wrap::before { content:''; position: absolute; top: 18px; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.08); z-index: 0; }
+.progress-bar-fill { position: absolute; top: 18px; left: 0; height: 2px; background: var(--sky); z-index: 1; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+.step-node { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative; z-index: 2; }
+.step-node .bubble { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: var(--muted); transition: all 0.3s ease; }
+.step-node.active .bubble { background: var(--sky); border-color: var(--sky); color: white; box-shadow: 0 0 0 4px rgba(37,99,235,0.25); }
+.step-node.done .bubble { background: var(--green); border-color: var(--green); color: white; }
+.step-node .step-label { font-size: 0.7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; transition: color 0.3s; }
+.step-node.active .step-label { color: #93c5fd; }
+.step-node.done .step-label { color: var(--green); }
+
+/* ── Card ───────────────────────────────────────── */
+.card { background: var(--white); border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; animation: slideUp 0.4s cubic-bezier(0.4,0,0.2,1); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.card-header { background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%); padding: 28px 36px; display: flex; align-items: center; gap: 16px; }
+.card-header h2 { font-family: 'DM Serif Display', serif; color: white; font-size: 1.5rem; }
+.card-header p { color: #94a3b8; font-size: 0.85rem; margin-top: 4px; font-weight: 300; }
+.card-header .icon { width: 48px; height: 48px; background: rgba(255,255,255,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+.card-body { padding: 36px; }
+.step { display: none; } .step.active { display: block; }
+
+/* ── Form ───────────────────────────────────────── */
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--steel); margin-bottom: 8px; }
+input[type="text"], textarea {
+  width: 100%; padding: 13px 16px; border: 2px solid var(--border); border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif; font-size: 1rem; color: var(--text); background: var(--cloud);
+  transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+}
+input:focus, textarea:focus { border-color: var(--sky); box-shadow: 0 0 0 4px rgba(37,99,235,0.12); background: white; }
+input.error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(239,68,68,0.12); }
+.error-msg { font-size: 0.8rem; color: var(--red); margin-top: 5px; font-weight: 500; display: none; }
+
+/* ── Buttons ────────────────────────────────────── */
+.btn { padding: 13px 28px; border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 700; cursor: pointer; border: 2px solid transparent; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 8px; }
+.btn-primary { background: var(--sky); color: white; box-shadow: 0 4px 16px rgba(37,99,235,0.30); }
+.btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(37,99,235,0.35); }
+.btn-secondary { background: transparent; color: var(--steel); border-color: var(--border); }
+.btn-secondary:hover { background: var(--cloud); color: var(--text); }
+.btn-accent { background: var(--accent); color: white; box-shadow: 0 4px 16px rgba(245,158,11,0.30); }
+.btn-accent:hover { background: #d97706; transform: translateY(-1px); }
+.btn-row { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; margin-top: 28px; }
+.hint-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 20px; margin-bottom: 28px; font-size: 0.85rem; color: #1e40af; line-height: 1.7; }
+
+/* ── SWOT 2x2 Factor Input Grid ────────────────── */
+.swot-input-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+@media (max-width: 620px) { .swot-input-grid { grid-template-columns: 1fr; } }
+
+.swot-section {
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.swot-section:focus-within { border-color: var(--sky); }
+.swot-section-header {
+  padding: 14px 18px;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 2px solid var(--border);
+}
+.swot-section-header .sec-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.swot-section-header h3 {
+  font-size: 0.82rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em; color: var(--text);
+}
+.swot-section-header .sec-badge {
+  margin-left: auto;
+  font-size: 0.72rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 999px;
+}
+.swot-section-header .sec-subtitle {
+  font-size: 0.68rem; font-weight: 500; color: var(--steel); margin-left: 4px;
+}
+.swot-section-body { padding: 14px 18px; background: var(--cloud); }
+.swot-factor-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+  animation: rowIn 0.2s ease;
+}
+@keyframes rowIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+.swot-factor-row .row-num {
+  font-size: 0.68rem; font-weight: 700;
+  color: var(--muted); width: 16px; text-align: right; flex-shrink: 0;
+}
+.swot-factor-row .factor-input {
+  flex: 1;
+  padding: 7px 10px !important;
+  font-size: 0.82rem !important;
+  background: white !important;
+  border: 1.5px solid var(--border) !important;
+  border-radius: 8px !important;
+}
+.swot-factor-row .factor-input:focus {
+  border-color: var(--sky) !important;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.10) !important;
+}
+.remove-btn {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: none; background: transparent;
+  color: var(--muted); cursor: pointer; font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s; flex-shrink: 0;
+}
+.remove-btn:hover { background: #fee2e2; color: var(--red); }
+.remove-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+.swot-section-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 10px; gap: 10px;
+}
+.add-btn {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.78rem; font-weight: 700; color: var(--sky);
+  background: rgba(37,99,235,0.08);
+  border: 1.5px dashed rgba(37,99,235,0.3);
+  border-radius: 8px; padding: 6px 12px;
+  cursor: pointer; transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.add-btn:hover { background: rgba(37,99,235,0.15); border-color: var(--sky); }
+.add-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.count-badge {
+  font-size: 0.72rem; font-weight: 700; color: var(--steel);
+  background: white; border-radius: 6px; padding: 4px 10px;
+  border: 1px solid var(--border);
+}
+
+/* ── Results: Factor Summary Boxes ─────────────── */
+.factor-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+@media (max-width: 620px) { .factor-summary-grid { grid-template-columns: 1fr; } }
+.factor-summary-box {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.factor-summary-box .fsb-header {
+  padding: 12px 18px;
+  display: flex; align-items: center; gap: 8px;
+  color: white; font-size: 0.78rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.factor-summary-box .fsb-body {
+  padding: 14px 18px; background: white;
+}
+.factor-summary-box .fsb-body ol {
+  margin: 0; padding-left: 20px;
+}
+.factor-summary-box .fsb-body li {
+  font-size: 0.82rem; color: var(--text); line-height: 1.8;
+}
+
+/* ── Results: SWOT Strategy Matrix ─────────────── */
+.swot-matrix {
+  display: grid;
+  grid-template-columns: 200px 1fr 1fr;
+  grid-template-rows: auto 1fr 1fr;
+  gap: 2px;
+  background: var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+@media (max-width: 700px) {
+  .swot-matrix { grid-template-columns: 1fr; grid-template-rows: auto; }
+  .swot-matrix .matrix-corner,
+  .swot-matrix .matrix-col-header,
+  .swot-matrix .matrix-row-header { display: none; }
+  .swot-matrix .matrix-cell { border-radius: 0; }
+}
+.matrix-corner {
+  background: var(--navy);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.matrix-corner span {
+  font-family: 'DM Serif Display', serif;
+  color: white; font-size: 1rem;
+}
+.matrix-col-header {
+  padding: 14px 16px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 4px;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.matrix-col-header h4 {
+  font-size: 0.88rem; font-weight: 700; color: white;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.matrix-col-header p { font-size: 0.7rem; color: rgba(255,255,255,0.7); font-weight: 500; }
+.matrix-row-header {
+  padding: 16px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 4px;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.matrix-row-header h4 {
+  font-size: 0.88rem; font-weight: 700; color: white;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.matrix-row-header p { font-size: 0.7rem; color: rgba(255,255,255,0.7); font-weight: 500; }
+.matrix-cell {
+  padding: 18px;
+  display: flex; flex-direction: column; gap: 12px;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.matrix-cell .cell-label {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1rem; font-weight: 400; margin-bottom: 2px;
+}
+.matrix-cell .cell-factors {
+  font-size: 0.72rem; color: var(--steel); line-height: 1.6;
+}
+.matrix-cell .cell-factors strong { color: var(--text); }
+.matrix-cell textarea {
+  width: 100%; min-height: 80px; resize: vertical;
+  padding: 10px 12px !important; font-size: 0.8rem !important;
+  border: 1.5px solid var(--border) !important;
+  border-radius: 8px !important; background: rgba(255,255,255,0.7) !important;
+  font-family: 'DM Sans', sans-serif; line-height: 1.6;
+  color: var(--text);
+}
+.matrix-cell textarea::placeholder { color: var(--muted); font-size: 0.75rem; }
+.matrix-cell textarea:focus {
+  border-color: var(--sky) !important;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.10) !important;
+  background: white !important;
+}
+
+/* ── Key Insights Panel ────────────────────────── */
+.insights-card {
+  background: white; border-radius: 20px; box-shadow: var(--shadow);
+  overflow: hidden; margin-bottom: 28px;
+}
+.insights-header {
+  padding: 24px 28px 20px;
+  border-bottom: 2px solid var(--border);
+  display: flex; align-items: flex-start; gap: 16px;
+}
+.insights-header .icon-big { font-size: 2rem; line-height: 1; }
+.insights-header h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.3rem; color: var(--text); margin-bottom: 4px;
+}
+.insights-header p { color: var(--steel); font-size: 0.88rem; line-height: 1.6; }
+.insights-body { padding: 24px 28px; }
+.insight-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.insight-row:last-child { border-bottom: none; }
+.insight-row .insight-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
+.insight-row .insight-text { font-size: 0.88rem; color: var(--text); line-height: 1.6; }
+.insight-row .insight-text strong { color: var(--text); }
+
+/* ── Strategy Card (reused pattern) ────────────── */
+.strategy-card { background: white; border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px; }
+.strategy-header { padding: 24px 28px 20px; border-bottom: 2px solid var(--border); display: flex; align-items: flex-start; gap: 16px; }
+.strategy-header .icon-big { font-size: 2rem; line-height: 1; }
+.strategy-header h3 { font-family: 'DM Serif Display', serif; font-size: 1.3rem; color: var(--text); margin-bottom: 4px; }
+.strategy-header p { color: var(--steel); font-size: 0.88rem; line-height: 1.6; }
+.strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.strategy-item { padding: 20px 24px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); transition: background 0.15s; }
+.strategy-item:hover { background: var(--cloud); }
+.strategy-item:nth-child(even) { border-right: none; }
+.strategy-item:nth-last-child(-n+2) { border-bottom: none; }
+.strategy-item h4 { font-size: 0.88rem; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.strategy-item p { font-size: 0.82rem; color: var(--steel); line-height: 1.6; }
+
+/* ── Print ──────────────────────────────────────── */
+.print-only { display: none; }
+@media print {
+  body { background: white !important; color: black; }
+  @page { margin: 1.5cm; }
+  .app-header, .progress-bar-wrap, .no-print, #step1, #step2 { display: none !important; }
+  .print-only { display: block !important; }
+  #step3 { display: block !important; }
+  .card, .chart-wrap, .score-summary, .strategy-card, .insights-card { box-shadow: none !important; border: 1px solid #ddd; }
+  .card-header, .chart-topbar { background: #1a3a6e !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .app-shell { padding: 0; max-width: 100%; }
+  .strategy-item { break-inside: avoid; }
+  .score-summary { break-inside: avoid; }
+  .factor-summary-grid { break-inside: avoid; }
+  .strategy-grid { grid-template-columns: 1fr 1fr; }
+  .print-header { text-align: center; padding: 20px 0 30px; border-bottom: 3px solid #1a3a6e; margin-bottom: 24px; }
+  .print-header h1 { font-size: 1.8rem; color: #1a3a6e; font-family: 'DM Serif Display', serif; }
+  .print-header p { color: #666; font-size: 0.9rem; margin-top: 6px; }
+
+  /* SWOT Matrix print */
+  .swot-matrix {
+    break-inside: avoid;
+  }
+  .matrix-cell textarea {
+    border: 1px solid #ccc !important;
+    background: transparent !important;
+    min-height: 60px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    overflow: visible !important;
+    white-space: pre-wrap;
+  }
+  .matrix-cell {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .matrix-col-header, .matrix-row-header, .matrix-corner {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .factor-summary-box .fsb-header {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .insights-card { break-inside: avoid; }
+  .insight-row { break-inside: avoid; }
+}
+@media (max-width: 620px) { .strategy-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <div class="app-header no-print">
+    <div class="eyebrow">Strategic Management Tool</div>
+    <h1>SWOT <em>Analysis</em></h1>
+    <p>Combine internal strengths and weaknesses with external opportunities and threats to generate strategic options.</p>
+  </div>
+
+  <div class="progress-bar-wrap no-print" id="progressBar">
+    <div class="progress-bar-fill" id="progressFill" style="width:16%"></div>
+    <div class="step-node active" id="node1"><div class="bubble">1</div><span class="step-label">Company</span></div>
+    <div class="step-node" id="node2"><div class="bubble">2</div><span class="step-label">Factors</span></div>
+    <div class="step-node" id="node3"><div class="bubble">3</div><span class="step-label">Results</span></div>
+  </div>
+
+  <!-- ═══════════ STEP 1 ═══════════ -->
+  <div class="step active" id="step1">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">&#x1F3E2;</div>
+        <div><h2>Company Information</h2><p>Identify the organization being analyzed</p></div>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="companyName">Company Name *</label>
+          <input type="text" id="companyName" placeholder="e.g. Apple Inc." aria-label="Company Name">
+          <div class="error-msg" id="err-company">Please enter a company name to continue.</div>
+        </div>
+        <div class="form-group">
+          <label for="companyIndustry">Industry / Sector</label>
+          <input type="text" id="companyIndustry" placeholder="e.g. Consumer Electronics" aria-label="Industry or Sector">
+        </div>
+        <div class="form-group">
+          <label for="analystName">Analyst Name</label>
+          <input type="text" id="analystName" placeholder="e.g. Jane Smith" aria-label="Analyst Name">
+        </div>
+        <div class="form-group">
+          <label for="analysisDate">Date</label>
+          <input type="text" id="analysisDate" placeholder="" aria-label="Analysis Date">
+        </div>
+
+        <div class="hint-box">
+          <strong>About the SWOT Analysis:</strong><br>
+          SWOT combines internal factors (Strengths and Weaknesses) with external factors (Opportunities and Threats) to generate four types of strategies:<br>
+          &bull; <strong>SO Strategies</strong> &mdash; Use strengths to capitalize on opportunities<br>
+          &bull; <strong>WO Strategies</strong> &mdash; Overcome weaknesses by exploiting opportunities<br>
+          &bull; <strong>ST Strategies</strong> &mdash; Use strengths to avoid or mitigate threats<br>
+          &bull; <strong>WT Strategies</strong> &mdash; Minimize weaknesses and avoid threats<br><br>
+          SWOT is a qualitative matching tool &mdash; there are no numeric scores. You will identify factors in Step 2, then write strategies in the results.
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnToStep2">Continue to Factors &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 2 ═══════════ -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">&#x1F4CB;</div>
+        <div><h2>SWOT Factors</h2><p>Identify internal and external factors for the analysis</p></div>
+      </div>
+      <div class="card-body">
+        <div class="hint-box">
+          <strong>&#x1F4D8; How to use this tool:</strong><br>
+          &bull; <strong>Strengths</strong>: Internal advantages your company has over competitors (resources, capabilities, skills).<br>
+          &bull; <strong>Weaknesses</strong>: Internal limitations or deficiencies that place the company at a disadvantage.<br>
+          &bull; <strong>Opportunities</strong>: External trends or conditions that could benefit the company (market growth, technology, regulation changes).<br>
+          &bull; <strong>Threats</strong>: External trends or conditions that could harm the company (competition, economic downturn, supply chain risks).<br>
+          &bull; Enter at least <strong>1 factor in each section</strong>. You can add up to 10 factors per section.
+        </div>
+
+        <div class="swot-input-grid" id="swotInputGrid"></div>
+
+        <div id="form-error" style="display:none; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:20px; color:#dc2626; font-size:0.85rem; font-weight:500;"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="goToStep1()">&larr; Back</button>
+          <button class="btn btn-primary" onclick="generateResults()">Generate Results &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 3 ═══════════ -->
+  <div class="step" id="step3">
+    <div class="print-only print-header">
+      <h1 id="print-title">SWOT Analysis</h1>
+      <p id="print-meta"></p>
+    </div>
+
+    <!-- Factor Summary -->
+    <div class="factor-summary-grid" id="factorSummaryGrid"></div>
+
+    <!-- SWOT Strategy Matrix -->
+    <div class="swot-matrix" id="swotMatrix"></div>
+
+    <!-- Key Insights -->
+    <div class="insights-card" id="insightsCard"></div>
+
+    <div class="btn-row no-print">
+      <button class="btn btn-secondary" onclick="goToStep2()">&larr; Edit Factors</button>
+      <button class="btn btn-secondary" onclick="resetAll()">&#x21BA; Start Over</button>
+      <button class="btn btn-accent" onclick="window.print()">&#x1F5A8;&#xFE0F; Print / Save PDF</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   SWOT Analysis Tool — JavaScript
+   ═══════════════════════════════════════════════════════ */
+
+const MAX_ROWS = 10, MIN_ROWS = 1;
+
+const SECTIONS = [
+  {
+    id: 'strengths',
+    abbr: 'S',
+    name: 'Strengths',
+    subtitle: 'Internal Positive Factors',
+    color: '#16a34a',
+    headerBg: '#f0fdf4',
+    chipBg: '#dcfce7',
+    chipColor: '#15803d',
+    placeholder: 'e.g. Strong brand recognition'
+  },
+  {
+    id: 'weaknesses',
+    abbr: 'W',
+    name: 'Weaknesses',
+    subtitle: 'Internal Negative Factors',
+    color: '#dc2626',
+    headerBg: '#fef2f2',
+    chipBg: '#fee2e2',
+    chipColor: '#b91c1c',
+    placeholder: 'e.g. High manufacturing costs'
+  },
+  {
+    id: 'opportunities',
+    abbr: 'O',
+    name: 'Opportunities',
+    subtitle: 'External Positive Factors',
+    color: '#0891b2',
+    headerBg: '#ecfeff',
+    chipBg: '#cffafe',
+    chipColor: '#0e7490',
+    placeholder: 'e.g. Growing Asian markets'
+  },
+  {
+    id: 'threats',
+    abbr: 'T',
+    name: 'Threats',
+    subtitle: 'External Negative Factors',
+    color: '#ea580c',
+    headerBg: '#fff7ed',
+    chipBg: '#ffedd5',
+    chipColor: '#c2410c',
+    placeholder: 'e.g. Increasing raw material costs'
+  }
+];
+
+let results = {};
+
+/* ── Date ───────────────────────────────────────── */
+(function() {
+  var now = new Date();
+  var m = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('analysisDate').value = m[now.getMonth()] + ' ' + now.getFullYear();
+})();
+
+/* ── Navigation ─────────────────────────────────── */
+function setStep(n) {
+  document.querySelectorAll('.step').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById('step' + n).classList.add('active');
+  for (var i = 1; i <= 3; i++) {
+    var node = document.getElementById('node' + i);
+    node.classList.remove('active','done');
+    if (i < n) node.classList.add('done');
+    else if (i === n) node.classList.add('active');
+  }
+  document.getElementById('progressFill').style.width = (n === 1 ? 16 : n === 2 ? 50 : 92) + '%';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function goToStep1() { setStep(1); }
+function goToStep2() { setStep(2); }
+
+/* ── Step 1 Validation ──────────────────────────── */
+document.getElementById('btnToStep2').onclick = function() {
+  var name = document.getElementById('companyName').value.trim();
+  var err = document.getElementById('err-company');
+  if (!name) {
+    document.getElementById('companyName').classList.add('error');
+    err.style.display = 'block';
+    return;
+  }
+  document.getElementById('companyName').classList.remove('error');
+  err.style.display = 'none';
+  setStep(2);
+};
+
+/* ── Build SWOT Input Sections ─────────────────── */
+function buildSections() {
+  var grid = document.getElementById('swotInputGrid');
+  grid.innerHTML = '';
+  SECTIONS.forEach(function(sec) {
+    var box = document.createElement('div');
+    box.className = 'swot-section';
+    box.id = 'sec-' + sec.id;
+    box.innerHTML =
+      '<div class="swot-section-header" style="background:' + sec.headerBg + '">' +
+        '<div class="sec-dot" style="background:' + sec.color + '"></div>' +
+        '<h3>' + sec.name + '</h3>' +
+        '<span class="sec-subtitle">' + sec.subtitle + '</span>' +
+        '<span class="sec-badge" style="background:' + sec.chipBg + ';color:' + sec.chipColor + '">' + sec.abbr + '</span>' +
+      '</div>' +
+      '<div class="swot-section-body">' +
+        '<div class="factor-list" id="factors-' + sec.id + '"></div>' +
+        '<div class="swot-section-footer">' +
+          '<button class="add-btn" id="add-' + sec.id + '" onclick="addFactor(\'' + sec.id + '\')">' +
+            '<span style="font-size:1.1rem;line-height:1">+</span> Add ' + sec.name.slice(0, -1).replace(/ie$/, 'y') +
+          '</button>' +
+          '<span class="count-badge" id="count-' + sec.id + '">0 factors</span>' +
+        '</div>' +
+      '</div>';
+    grid.appendChild(box);
+
+    // Add 3 default blank rows
+    for (var r = 0; r < 3; r++) {
+      addFactor(sec.id);
+    }
+  });
+}
+
+function addFactor(secId, labelText) {
+  var sec = SECTIONS.find(function(x) { return x.id === secId; });
+  var list = document.getElementById('factors-' + secId);
+  if (list.querySelectorAll('.swot-factor-row').length >= MAX_ROWS) return;
+
+  var row = document.createElement('div');
+  row.className = 'swot-factor-row';
+
+  var num = document.createElement('span');
+  num.className = 'row-num';
+  num.textContent = list.querySelectorAll('.swot-factor-row').length + 1;
+
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'factor-input';
+  inp.placeholder = sec.placeholder;
+  inp.value = labelText || '';
+  inp.maxLength = 80;
+  inp.setAttribute('aria-label', sec.name + ' factor');
+  inp.addEventListener('input', function() { updateCounts(); });
+
+  var delBtn = document.createElement('button');
+  delBtn.className = 'remove-btn';
+  delBtn.title = 'Remove this factor';
+  delBtn.innerHTML = '\u2715';
+  delBtn.onclick = function() { removeFactor(secId, row); };
+
+  row.appendChild(num);
+  row.appendChild(inp);
+  row.appendChild(delBtn);
+  list.appendChild(row);
+  updateRowNums(secId);
+  updateCounts();
+  if (labelText === undefined && list.querySelectorAll('.swot-factor-row').length > 3) inp.focus();
+}
+
+function removeFactor(secId, rowEl) {
+  var list = document.getElementById('factors-' + secId);
+  if (list.querySelectorAll('.swot-factor-row').length <= MIN_ROWS) return;
+  rowEl.style.cssText = 'opacity:0;transform:translateX(8px);transition:opacity 0.18s,transform 0.18s;';
+  setTimeout(function() { rowEl.remove(); updateRowNums(secId); updateCounts(); }, 190);
+}
+
+function updateRowNums(secId) {
+  var rows = document.querySelectorAll('#factors-' + secId + ' .swot-factor-row');
+  rows.forEach(function(r, i) {
+    r.querySelector('.row-num').textContent = i + 1;
+    r.querySelector('.remove-btn').disabled = (rows.length <= MIN_ROWS);
+  });
+  var btn = document.getElementById('add-' + secId);
+  if (btn) btn.disabled = rows.length >= MAX_ROWS;
+}
+
+function updateCounts() {
+  SECTIONS.forEach(function(sec) {
+    var filled = getFactors(sec.id).length;
+    var total = document.querySelectorAll('#factors-' + sec.id + ' .swot-factor-row').length;
+    var el = document.getElementById('count-' + sec.id);
+    if (el) el.textContent = filled + ' of ' + total + ' filled';
+  });
+}
+
+function getFactors(secId) {
+  var rows = document.querySelectorAll('#factors-' + secId + ' .swot-factor-row');
+  var factors = [];
+  rows.forEach(function(row, i) {
+    var val = row.querySelector('.factor-input').value.trim();
+    if (val) factors.push(val);
+  });
+  return factors;
+}
+
+/* ── Generate Results ───────────────────────────── */
+function generateResults() {
+  var errBox = document.getElementById('form-error');
+  errBox.style.display = 'none';
+  var errors = [];
+
+  var strengths = getFactors('strengths');
+  var weaknesses = getFactors('weaknesses');
+  var opportunities = getFactors('opportunities');
+  var threats = getFactors('threats');
+
+  if (strengths.length === 0) errors.push('Enter at least 1 Strength factor.');
+  if (weaknesses.length === 0) errors.push('Enter at least 1 Weakness factor.');
+  if (opportunities.length === 0) errors.push('Enter at least 1 Opportunity factor.');
+  if (threats.length === 0) errors.push('Enter at least 1 Threat factor.');
+
+  if (errors.length) {
+    errBox.innerHTML = errors.join('<br>');
+    errBox.style.display = 'block';
+    return;
+  }
+
+  results = {
+    company: document.getElementById('companyName').value.trim(),
+    industry: document.getElementById('companyIndustry').value.trim(),
+    analyst: document.getElementById('analystName').value.trim(),
+    date: document.getElementById('analysisDate').value.trim(),
+    strengths: strengths,
+    weaknesses: weaknesses,
+    opportunities: opportunities,
+    threats: threats
+  };
+
+  buildFactorSummary();
+  buildSwotMatrix();
+  buildInsightsPanel();
+  updatePrintHeader();
+  setStep(3);
+}
+
+/* ── Factor Summary Boxes ──────────────────────── */
+function buildFactorSummary() {
+  var grid = document.getElementById('factorSummaryGrid');
+  var groups = [
+    { label: 'Strengths', abbr: 'S', color: '#16a34a', factors: results.strengths },
+    { label: 'Weaknesses', abbr: 'W', color: '#dc2626', factors: results.weaknesses },
+    { label: 'Opportunities', abbr: 'O', color: '#0891b2', factors: results.opportunities },
+    { label: 'Threats', abbr: 'T', color: '#ea580c', factors: results.threats }
+  ];
+
+  grid.innerHTML = groups.map(function(g) {
+    return '<div class="factor-summary-box">' +
+      '<div class="fsb-header" style="background:' + g.color + '">' +
+        '<strong>' + g.abbr + '</strong>&nbsp;&mdash;&nbsp;' + g.label + ' (' + g.factors.length + ')' +
+      '</div>' +
+      '<div class="fsb-body"><ol>' +
+        g.factors.map(function(f) { return '<li>' + escHtml(f) + '</li>'; }).join('') +
+      '</ol></div>' +
+    '</div>';
+  }).join('');
+}
+
+/* ── SWOT Strategy Matrix ──────────────────────── */
+function buildSwotMatrix() {
+  var r = results;
+  var matrix = document.getElementById('swotMatrix');
+
+  // Build factor lists as small text for each cell
+  var sList = r.strengths.map(function(s, i) { return '<strong>S' + (i+1) + '.</strong> ' + escHtml(s); }).join('<br>');
+  var wList = r.weaknesses.map(function(w, i) { return '<strong>W' + (i+1) + '.</strong> ' + escHtml(w); }).join('<br>');
+  var oList = r.opportunities.map(function(o, i) { return '<strong>O' + (i+1) + '.</strong> ' + escHtml(o); }).join('<br>');
+  var tList = r.threats.map(function(t, i) { return '<strong>T' + (i+1) + '.</strong> ' + escHtml(t); }).join('<br>');
+
+  matrix.innerHTML =
+    // Row 0: Corner + Column Headers
+    '<div class="matrix-corner"><span>SWOT</span></div>' +
+    '<div class="matrix-col-header" style="background:#16a34a;"><h4>Strengths (S)</h4><p>Internal Positive</p></div>' +
+    '<div class="matrix-col-header" style="background:#dc2626;"><h4>Weaknesses (W)</h4><p>Internal Negative</p></div>' +
+
+    // Row 1: Opportunities row header + SO cell + WO cell
+    '<div class="matrix-row-header" style="background:#0891b2;"><h4>Opportunities (O)</h4><p>External Positive</p></div>' +
+    '<div class="matrix-cell" style="background:#f0fdf9;">' +
+      '<div class="cell-label" style="color:#16a34a;">SO Strategies</div>' +
+      '<div class="cell-factors">' + sList + '<br><br>' + oList + '</div>' +
+      '<textarea id="soStrategies" placeholder="List strategies that use your strengths to capitalize on external opportunities. Example: Use S1 to pursue O1." aria-label="SO Strategies"></textarea>' +
+    '</div>' +
+    '<div class="matrix-cell" style="background:#ecfeff;">' +
+      '<div class="cell-label" style="color:#0891b2;">WO Strategies</div>' +
+      '<div class="cell-factors">' + wList + '<br><br>' + oList + '</div>' +
+      '<textarea id="woStrategies" placeholder="List strategies that overcome weaknesses by exploiting opportunities. Example: Address W1 by taking advantage of O1." aria-label="WO Strategies"></textarea>' +
+    '</div>' +
+
+    // Row 2: Threats row header + ST cell + WT cell
+    '<div class="matrix-row-header" style="background:#ea580c;"><h4>Threats (T)</h4><p>External Negative</p></div>' +
+    '<div class="matrix-cell" style="background:#fff7ed;">' +
+      '<div class="cell-label" style="color:#ea580c;">ST Strategies</div>' +
+      '<div class="cell-factors">' + sList + '<br><br>' + tList + '</div>' +
+      '<textarea id="stStrategies" placeholder="List strategies that use your strengths to avoid or mitigate threats. Example: Use S1 to counter T1." aria-label="ST Strategies"></textarea>' +
+    '</div>' +
+    '<div class="matrix-cell" style="background:#fef2f2;">' +
+      '<div class="cell-label" style="color:#dc2626;">WT Strategies</div>' +
+      '<div class="cell-factors">' + wList + '<br><br>' + tList + '</div>' +
+      '<textarea id="wtStrategies" placeholder="List defensive strategies that minimize weaknesses and avoid threats. Example: Reduce W1 exposure to T1." aria-label="WT Strategies"></textarea>' +
+    '</div>';
+}
+
+/* ── Key Insights Panel ────────────────────────── */
+function buildInsightsPanel() {
+  var r = results;
+  var sCount = r.strengths.length;
+  var wCount = r.weaknesses.length;
+  var oCount = r.opportunities.length;
+  var tCount = r.threats.length;
+  var total = sCount + wCount + oCount + tCount;
+
+  // Determine dominant strategic position
+  var combos = [
+    { label: 'SO (Aggressive/Offensive)', count: sCount + oCount, type: 'SO', color: '#16a34a' },
+    { label: 'WO (Turnaround/Improvement)', count: wCount + oCount, type: 'WO', color: '#0891b2' },
+    { label: 'ST (Diversification/Defensive)', count: sCount + tCount, type: 'ST', color: '#ea580c' },
+    { label: 'WT (Retrenchment/Survival)', count: wCount + tCount, type: 'WT', color: '#dc2626' }
+  ];
+  combos.sort(function(a, b) { return b.count - a.count; });
+  var dominant = combos[0];
+
+  // Internal vs external balance
+  var internalCount = sCount + wCount;
+  var externalCount = oCount + tCount;
+  var balanceText;
+  if (internalCount > externalCount) {
+    balanceText = r.company + ' has identified more internal factors (' + internalCount + ') than external factors (' + externalCount + '). Consider whether additional external analysis is needed to ensure a balanced perspective.';
+  } else if (externalCount > internalCount) {
+    balanceText = r.company + ' has identified more external factors (' + externalCount + ') than internal factors (' + internalCount + '). Consider whether additional internal analysis could reveal further strengths or weaknesses.';
+  } else {
+    balanceText = r.company + ' has a balanced analysis with ' + internalCount + ' internal and ' + externalCount + ' external factors, suggesting thorough coverage of both environments.';
+  }
+
+  // Positive vs negative
+  var posCount = sCount + oCount;
+  var negCount = wCount + tCount;
+  var outlookText;
+  if (posCount > negCount) {
+    outlookText = 'The analysis leans positive with ' + posCount + ' favorable factors vs. ' + negCount + ' unfavorable ones, suggesting opportunities for growth-oriented strategies.';
+  } else if (negCount > posCount) {
+    outlookText = 'The analysis leans negative with ' + negCount + ' unfavorable factors vs. ' + posCount + ' favorable ones, suggesting the need for defensive or corrective strategies.';
+  } else {
+    outlookText = 'The analysis is evenly split between ' + posCount + ' favorable and ' + negCount + ' unfavorable factors, requiring careful strategic balancing.';
+  }
+
+  var card = document.getElementById('insightsCard');
+  card.innerHTML =
+    '<div class="insights-header">' +
+      '<div class="icon-big">&#x1F4CA;</div>' +
+      '<div>' +
+        '<h3>Key Insights</h3>' +
+        '<p>' + r.company + ' &mdash; SWOT Analysis Summary</p>' +
+      '</div>' +
+    '</div>' +
+    '<div class="insights-body">' +
+      '<div class="insight-row">' +
+        '<span class="insight-icon">&#x1F4DD;</span>' +
+        '<div class="insight-text">You identified <strong>' + total + ' total factors</strong>: ' +
+          sCount + ' strengths, ' + wCount + ' weaknesses, ' + oCount + ' opportunities, and ' + tCount + ' threats.</div>' +
+      '</div>' +
+      '<div class="insight-row">' +
+        '<span class="insight-icon">&#x1F3AF;</span>' +
+        '<div class="insight-text">Your strongest strategic position appears to be <strong style="color:' + dominant.color + '">' + dominant.label + '</strong> based on the combined factor count (' + dominant.count + ' factors feed into this quadrant).</div>' +
+      '</div>' +
+      '<div class="insight-row">' +
+        '<span class="insight-icon">&#x2696;&#xFE0F;</span>' +
+        '<div class="insight-text">' + balanceText + '</div>' +
+      '</div>' +
+      '<div class="insight-row">' +
+        '<span class="insight-icon">&#x1F52E;</span>' +
+        '<div class="insight-text">' + outlookText + '</div>' +
+      '</div>' +
+      '<div class="insight-row">' +
+        '<span class="insight-icon">&#x1F4A1;</span>' +
+        '<div class="insight-text">Use the strategy matrix above to write specific strategies for each quadrant. Focus your strongest effort on the <strong>' + dominant.type + ' quadrant</strong> where you have the most factors to work with, then address the remaining quadrants in priority order.</div>' +
+      '</div>' +
+    '</div>';
+}
+
+/* ── Print Header ──────────────────────────────── */
+function updatePrintHeader() {
+  document.getElementById('print-title').textContent = 'SWOT Analysis \u2014 ' + results.company;
+  var meta = [];
+  if (results.industry) meta.push(results.industry);
+  if (results.analyst) meta.push('Analyst: ' + results.analyst);
+  if (results.date) meta.push(results.date);
+  document.getElementById('print-meta').textContent = meta.join('  |  ');
+}
+
+/* ── Reset ──────────────────────────────────────── */
+function resetAll() {
+  results = {};
+  ['companyName','companyIndustry','analystName','analysisDate']
+    .forEach(function(id) { var el = document.getElementById(id); if(el) el.value = ''; });
+  buildSections();
+  setStep(1);
+}
+
+/* ── Utility ───────────────────────────────────── */
+function escHtml(str) {
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
+/* ── Initialize ────────────────────────────────── */
+buildSections();
+</script>
+</body>
+</html>

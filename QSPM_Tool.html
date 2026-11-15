@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QSPM Analysis Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens ──────────────────────────────── */
+:root {
+  --navy:   #0f2342;
+  --cobalt: #1a3a6e;
+  --sky:    #2563eb;
+  --steel:  #64748b;
+  --cloud:  #f1f5f9;
+  --white:  #ffffff;
+  --accent: #f59e0b;
+  --green:  #10b981;
+  --red:    #ef4444;
+  --orange: #f97316;
+  --text:   #1e293b;
+  --muted:  #94a3b8;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow:    0 4px 24px rgba(15,35,66,0.10);
+  --shadow-lg: 0 12px 48px rgba(15,35,66,0.16);
+}
+
+/* ── Reset & Base ───────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text);
+  background: var(--navy);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%,
+      rgba(37,99,235,0.25) 0%, transparent 60%),
+    repeating-linear-gradient(0deg,
+      transparent, transparent 39px,
+      rgba(255,255,255,0.02) 39px,
+      rgba(255,255,255,0.02) 40px),
+    repeating-linear-gradient(90deg,
+      transparent, transparent 39px,
+      rgba(255,255,255,0.02) 39px,
+      rgba(255,255,255,0.02) 40px);
+  min-height: 100vh;
+  line-height: 1.7;
+}
+
+/* ── App Shell ──────────────────────────────────── */
+.app-shell { max-width: 960px; margin: 0 auto; padding: 40px 20px 80px; }
+
+/* ── App Header ─────────────────────────────────── */
+.app-header { text-align: center; margin-bottom: 48px; }
+.app-header .eyebrow {
+  display: inline-block;
+  background: rgba(37,99,235,0.25);
+  color: #93c5fd;
+  font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 6px 16px; border-radius: 999px;
+  border: 1px solid rgba(147,197,253,0.25);
+  margin-bottom: 20px;
+}
+.app-header h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  color: var(--white); line-height: 1.1; margin-bottom: 14px;
+}
+.app-header h1 em { font-style: italic; color: #93c5fd; }
+.app-header p {
+  color: #94a3b8; font-size: 1.05rem;
+  max-width: 520px; margin: 0 auto;
+  line-height: 1.7; font-weight: 300;
+}
+
+/* ── Progress Bar ───────────────────────────────── */
+.progress-bar-wrap {
+  display: flex; align-items: center;
+  margin-bottom: 40px; position: relative;
+}
+.progress-bar-wrap::before {
+  content: ''; position: absolute;
+  top: 18px; left: 0; right: 0;
+  height: 2px; background: rgba(255,255,255,0.08); z-index: 0;
+}
+.progress-bar-fill {
+  position: absolute; top: 18px; left: 0;
+  height: 2px; background: var(--sky); z-index: 1;
+  transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+.step-node {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; position: relative; z-index: 2;
+}
+.step-node .bubble {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  border: 2px solid rgba(255,255,255,0.12);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; font-weight: 700;
+  color: var(--muted); transition: all 0.3s ease;
+}
+.step-node.active .bubble {
+  background: var(--sky); border-color: var(--sky);
+  color: white; box-shadow: 0 0 0 4px rgba(37,99,235,0.25);
+}
+.step-node.done .bubble {
+  background: var(--green); border-color: var(--green); color: white;
+}
+.step-node .step-label {
+  font-size: 0.7rem; font-weight: 600;
+  color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.08em; transition: color 0.3s;
+}
+.step-node.active .step-label { color: #93c5fd; }
+.step-node.done .step-label   { color: var(--green); }
+
+/* ── Card ───────────────────────────────────────── */
+.card {
+  background: var(--white); border-radius: 20px;
+  box-shadow: var(--shadow-lg); overflow: hidden;
+  animation: slideUp 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card-header {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%);
+  padding: 28px 36px; display: flex; align-items: center; gap: 16px;
+}
+.card-header h2 {
+  font-family: 'DM Serif Display', serif;
+  color: white; font-size: 1.5rem;
+}
+.card-header p {
+  color: #94a3b8; font-size: 0.85rem; margin-top: 4px; font-weight: 300;
+}
+.card-header .icon {
+  width: 48px; height: 48px;
+  background: rgba(255,255,255,0.1); border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; flex-shrink: 0;
+}
+.card-body { padding: 36px; }
+
+/* ── Step Visibility ────────────────────────────── */
+.step { display: none; }
+.step.active { display: block; }
+
+/* ── Form Inputs ────────────────────────────────── */
+.form-group { margin-bottom: 20px; }
+.form-group label {
+  display: block; font-size: 0.82rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--steel); margin-bottom: 8px;
+}
+input[type="text"],
+input[type="number"],
+textarea {
+  width: 100%; padding: 13px 16px;
+  border: 2px solid var(--border); border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif; font-size: 1rem;
+  color: var(--text); background: var(--cloud);
+  transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+}
+input:focus, textarea:focus {
+  border-color: var(--sky);
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.12);
+  background: white;
+}
+input.error {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
+}
+.error-msg {
+  font-size: 0.8rem; color: var(--red);
+  margin-top: 5px; font-weight: 500; display: none;
+}
+
+/* ── Buttons ────────────────────────────────────── */
+.btn {
+  padding: 13px 28px; border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif; font-size: 0.9rem;
+  font-weight: 700; cursor: pointer; border: 2px solid transparent;
+  transition: all 0.2s ease; display: inline-flex;
+  align-items: center; gap: 8px;
+}
+.btn-primary {
+  background: var(--sky); color: white;
+  box-shadow: 0 4px 16px rgba(37,99,235,0.30);
+}
+.btn-primary:hover {
+  background: #1d4ed8; transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(37,99,235,0.35);
+}
+.btn-secondary {
+  background: transparent; color: var(--steel);
+  border-color: var(--border);
+}
+.btn-secondary:hover { background: var(--cloud); color: var(--text); }
+.btn-accent {
+  background: var(--accent); color: white;
+  box-shadow: 0 4px 16px rgba(245,158,11,0.30);
+}
+.btn-accent:hover { background: #d97706; transform: translateY(-1px); }
+.btn-green {
+  background: var(--green); color: white;
+  box-shadow: 0 4px 16px rgba(16,185,129,0.30);
+}
+.btn-green:hover { background: #059669; transform: translateY(-1px); }
+.btn-row {
+  display: flex; gap: 12px; justify-content: flex-end;
+  flex-wrap: wrap; margin-top: 28px;
+}
+
+/* ── Hint Box ───────────────────────────────────── */
+.hint-box {
+  background: #eff6ff; border: 1px solid #bfdbfe;
+  border-radius: 12px; padding: 18px 20px;
+  margin-bottom: 28px; font-size: 0.85rem;
+  color: #1e40af; line-height: 1.7;
+}
+
+/* ── Strategy Name Inputs (Step 1) ──────────────── */
+.strategy-name-section {
+  margin-top: 28px; padding-top: 24px;
+  border-top: 2px solid var(--border);
+}
+.strategy-name-section h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.15rem; color: var(--text);
+  margin-bottom: 16px;
+}
+.strategy-name-row {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 12px; animation: rowIn 0.2s ease;
+}
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.strategy-name-row .sn-num {
+  font-size: 0.75rem; font-weight: 700;
+  color: var(--muted); width: 20px; text-align: right; flex-shrink: 0;
+}
+.strategy-name-row .sn-chip {
+  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+}
+.strategy-name-row input {
+  flex: 1; padding: 10px 14px !important;
+  font-size: 0.92rem !important;
+}
+.strategy-name-row .remove-btn {
+  width: 30px; height: 30px; border-radius: 6px;
+  border: none; background: transparent;
+  color: var(--muted); cursor: pointer; font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s; flex-shrink: 0;
+}
+.strategy-name-row .remove-btn:hover { background: #fee2e2; color: var(--red); }
+.strategy-name-row .remove-btn:disabled { opacity: 0; cursor: default; pointer-events: none; }
+.add-strategy-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.82rem; font-weight: 700; color: var(--sky);
+  background: rgba(37,99,235,0.08);
+  border: 1.5px dashed rgba(37,99,235,0.3);
+  border-radius: 8px; padding: 8px 16px;
+  cursor: pointer; transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif; margin-top: 4px;
+}
+.add-strategy-btn:hover { background: rgba(37,99,235,0.15); border-color: var(--sky); }
+.add-strategy-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── QSPM Table (Step 2) ───────────────────────── */
+.qspm-section-wrap {
+  border: 2px solid var(--border); border-radius: 16px;
+  overflow: hidden; margin-bottom: 24px;
+}
+.qspm-section-header {
+  padding: 14px 18px; display: flex; align-items: center; gap: 10px;
+  border-bottom: 2px solid var(--border);
+}
+.qspm-section-header .dim-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.qspm-section-header h3 {
+  font-size: 0.82rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em; color: var(--text);
+}
+.qspm-section-header .dim-abbr {
+  margin-left: auto; font-size: 0.72rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 999px;
+}
+.qspm-section-body { padding: 14px 18px; background: var(--cloud); overflow-x: auto; }
+
+/* QSPM table within section */
+.qspm-table { width: 100%; border-collapse: collapse; min-width: 600px; }
+.qspm-table th {
+  font-size: 0.65rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 6px 4px; text-align: center; white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+.qspm-table th.th-factor { text-align: left; min-width: 160px; }
+.qspm-table th.th-weight { width: 68px; }
+.qspm-table th.th-as { width: 54px; }
+.qspm-table th.th-was { width: 58px; }
+.qspm-table th.th-del { width: 28px; }
+.qspm-table th.th-strat-group {
+  border-bottom: 2px solid var(--border);
+  padding: 4px 2px 2px;
+}
+.qspm-table td { padding: 4px 3px; vertical-align: middle; }
+.qspm-table .factor-row-num {
+  font-size: 0.68rem; font-weight: 700;
+  color: var(--muted); width: 18px; text-align: right;
+}
+.qspm-table .label-input {
+  width: 100%; padding: 6px 8px; font-size: 0.8rem;
+  background: white; border: 1.5px solid var(--border);
+  border-radius: 6px; font-family: 'DM Sans', sans-serif;
+  color: var(--text); outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.qspm-table .label-input:focus {
+  border-color: var(--sky);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.10);
+}
+.qspm-table .weight-input,
+.qspm-table .as-input {
+  width: 100%; text-align: center; padding: 6px 4px;
+  font-size: 0.85rem; background: white;
+  border: 1.5px solid var(--border); border-radius: 6px;
+  font-family: 'DM Sans', sans-serif; color: var(--text);
+  outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+}
+.qspm-table .weight-input:focus,
+.qspm-table .as-input:focus {
+  border-color: var(--sky);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.10);
+}
+.qspm-table .was-display {
+  text-align: center; font-size: 0.82rem; font-weight: 700;
+  color: var(--steel); white-space: nowrap;
+}
+.qspm-table .remove-btn {
+  width: 24px; height: 24px; border-radius: 6px;
+  border: none; background: transparent;
+  color: var(--muted); cursor: pointer; font-size: 0.9rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.qspm-table .remove-btn:hover { background: #fee2e2; color: var(--red); }
+.qspm-table .remove-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+
+/* Section footer */
+.qspm-section-footer {
+  display: flex; align-items: center;
+  justify-content: space-between; margin-top: 10px; gap: 10px;
+  flex-wrap: wrap;
+}
+.add-factor-btn {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.78rem; font-weight: 700; color: var(--sky);
+  background: rgba(37,99,235,0.08);
+  border: 1.5px dashed rgba(37,99,235,0.3);
+  border-radius: 8px; padding: 6px 12px;
+  cursor: pointer; transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.add-factor-btn:hover { background: rgba(37,99,235,0.15); border-color: var(--sky); }
+.add-factor-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Weight total bar */
+.weight-total-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; background: var(--white);
+  border-top: 2px solid var(--border);
+}
+.weight-total-bar .wt-label {
+  font-size: 0.82rem; font-weight: 700; color: var(--steel);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.weight-total-bar .wt-value { font-size: 1rem; font-weight: 700; }
+.wt-warn { color: var(--orange); }
+.wt-ok   { color: var(--green); }
+
+/* Section divider */
+.qspm-section-divider { border-top: 3px solid var(--border); }
+
+/* ── Form Error ─────────────────────────────────── */
+#form-error {
+  background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 8px; padding: 12px 16px;
+  margin-bottom: 20px; color: #dc2626;
+  font-size: 0.85rem; font-weight: 500;
+}
+
+/* ── Results — Score Summary Table ──────────────── */
+.score-summary {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow); overflow: hidden;
+  margin-bottom: 28px;
+}
+.score-table { width: 100%; border-collapse: collapse; }
+.score-table th {
+  background: var(--cloud); padding: 12px 20px;
+  text-align: left; font-size: 0.75rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--steel); border-bottom: 2px solid var(--border);
+}
+.score-table th.th-right { text-align: center; }
+.score-table td {
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.score-table tr:last-child td { border-bottom: none; }
+.score-table .dim-name { font-weight: 700; }
+.score-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 52px; height: 28px; border-radius: 6px;
+  font-size: 0.85rem; font-weight: 700; padding: 0 8px;
+}
+.coord-row { background: var(--navy); }
+.coord-row td {
+  border-bottom: none !important; padding: 16px 20px; color: white;
+}
+.coord-row .coord-pair {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.3rem; color: #93c5fd;
+}
+.winner-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #fef9c3; color: #a16207;
+  font-size: 0.72rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 999px; margin-left: 8px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+
+/* ── Chart Wrap ─────────────────────────────────── */
+.chart-wrap {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow); overflow: hidden;
+  margin-bottom: 28px;
+}
+.chart-topbar {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%);
+  padding: 18px 24px; display: flex; align-items: center; gap: 12px;
+}
+.chart-topbar h3 {
+  font-family: 'DM Serif Display', serif;
+  color: white; font-size: 1.15rem;
+}
+.chart-topbar .chart-icon {
+  width: 40px; height: 40px;
+  background: rgba(255,255,255,0.1); border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; flex-shrink: 0;
+}
+.chart-body { padding: 28px; }
+
+/* ── Strategy Card ──────────────────────────────── */
+.strategy-card {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow); overflow: hidden;
+  margin-bottom: 28px;
+}
+.strategy-header {
+  padding: 24px 28px 20px; border-bottom: 2px solid var(--border);
+  display: flex; align-items: flex-start; gap: 16px;
+}
+.strategy-header .icon-big { font-size: 2rem; line-height: 1; }
+.strategy-header h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.3rem; color: var(--text); margin-bottom: 4px;
+}
+.strategy-header p { color: var(--steel); font-size: 0.88rem; line-height: 1.6; }
+.strategy-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+}
+.strategy-item {
+  padding: 20px 24px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.strategy-item:hover { background: var(--cloud); }
+.strategy-item:nth-child(even) { border-right: none; }
+.strategy-item:nth-last-child(-n+2) { border-bottom: none; }
+.strategy-item h4 {
+  font-size: 0.88rem; font-weight: 700;
+  margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
+}
+.strategy-item p { font-size: 0.82rem; color: var(--steel); line-height: 1.6; }
+
+/* ── Print Validation Alert ────────────────────── */
+.print-alert {
+  background: #fef2f2;
+  border: 2px solid #fca5a5;
+  border-radius: 12px;
+  padding: 16px 24px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.print-alert p {
+  color: #dc2626;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ── Print ──────────────────────────────────────── */
+.print-only { display: none; }
+
+@media print {
+  body { background: white !important; color: black; }
+  @page { margin: 1.5cm; }
+  .app-header, .progress-bar-wrap, .no-print, #step1, #step2 { display: none !important; }
+  .print-only { display: block !important; }
+  #step3 { display: block !important; }
+  .card, .chart-wrap, .score-summary, .strategy-card {
+    box-shadow: none !important; border: 1px solid #ddd;
+  }
+  .card-header, .chart-topbar {
+    background: #1a3a6e !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .app-shell { padding: 0; max-width: 100%; }
+  canvas { max-width: 500px; margin: 0 auto; display: block; }
+  .strategy-item { break-inside: avoid; }
+  .score-summary { break-inside: avoid; }
+  .chart-wrap { break-inside: avoid; }
+  .strategy-grid { grid-template-columns: 1fr 1fr; }
+  .print-alert {
+    background: #fef2f2 !important;
+    border: 3px solid #dc2626 !important;
+    border-radius: 0 !important;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-alert p {
+    color: #dc2626 !important;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .print-header {
+    text-align: center; padding: 20px 0 30px;
+    border-bottom: 3px solid #1a3a6e; margin-bottom: 24px;
+  }
+  .print-header h1 {
+    font-size: 1.8rem; color: #1a3a6e;
+    font-family: 'DM Serif Display', serif;
+  }
+  .print-header p { color: #666; font-size: 0.9rem; margin-top: 6px; }
+}
+
+/* ── Responsive ─────────────────────────────────── */
+@media (max-width: 620px) {
+  .strategy-grid { grid-template-columns: 1fr; }
+  .card-body { padding: 24px 16px; }
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- App Header -->
+  <div class="app-header no-print">
+    <div class="eyebrow">Strategic Management Tool</div>
+    <h1>QSPM <em>Analysis</em></h1>
+    <p>Objectively evaluate competing strategic alternatives to determine which strategy best leverages key factors.</p>
+  </div>
+
+  <!-- Progress Bar -->
+  <div class="progress-bar-wrap no-print" id="progressBar">
+    <div class="progress-bar-fill" id="progressFill" style="width:16%"></div>
+    <div class="step-node active" id="node1">
+      <div class="bubble">1</div>
+      <span class="step-label">Company</span>
+    </div>
+    <div class="step-node" id="node2">
+      <div class="bubble">2</div>
+      <span class="step-label">Factors</span>
+    </div>
+    <div class="step-node" id="node3">
+      <div class="bubble">3</div>
+      <span class="step-label">Results</span>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 1 ═══════════ -->
+  <div class="step active" id="step1">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">🏢</div>
+        <div>
+          <h2>Company Information</h2>
+          <p>Identify the organization and strategic alternatives</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="companyName">Company Name *</label>
+          <input type="text" id="companyName" placeholder="e.g. Apple Inc." aria-label="Company Name">
+          <div class="error-msg" id="err-company">Please enter a company name to continue.</div>
+        </div>
+        <div class="form-group">
+          <label for="companyIndustry">Industry / Sector</label>
+          <input type="text" id="companyIndustry" placeholder="e.g. Consumer Electronics" aria-label="Industry or Sector">
+        </div>
+        <div class="form-group">
+          <label for="analystName">Analyst Name</label>
+          <input type="text" id="analystName" placeholder="e.g. Jane Smith" aria-label="Analyst Name">
+        </div>
+        <div class="form-group">
+          <label for="analysisDate">Date</label>
+          <input type="text" id="analysisDate" placeholder="" aria-label="Analysis Date">
+        </div>
+
+        <!-- Strategy Names -->
+        <div class="strategy-name-section">
+          <h3>Strategic Alternatives</h3>
+          <p style="font-size:0.85rem;color:var(--steel);margin-bottom:16px;">
+            Enter 2 to 4 strategies you want to compare. Each must have a name.
+          </p>
+          <div id="strategyNameList"></div>
+          <button class="add-strategy-btn" id="addStrategyBtn" onclick="addStrategyName()">
+            <span style="font-size:1.1rem;line-height:1">+</span> Add Strategy
+          </button>
+          <div class="error-msg" id="err-strategies" style="margin-top:8px;">Please enter at least 2 strategy names.</div>
+        </div>
+
+        <div class="hint-box" style="margin-top:28px;">
+          <strong>How the QSPM works:</strong><br>
+          The Quantitative Strategic Planning Matrix is the most analytical tool in the strategy formulation framework. You will enter <strong>key internal and external factors</strong> (from your IFE/EFE analyses) along with their <strong>weights</strong>. Then, for each factor, you assign an <strong>Attractiveness Score (1-4)</strong> for each strategy. The tool calculates a <strong>Total Attractiveness Score (TAS)</strong> for each strategy &mdash; the highest TAS indicates the best strategic alternative.
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnToStep2">Continue to Factors &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 2 ═══════════ -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">📊</div>
+        <div>
+          <h2>QSPM Factor Scoring</h2>
+          <p>Enter factors, weights, and attractiveness scores for each strategy</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="hint-box">
+          <strong>How to use this tool:</strong><br>
+          &bull; <strong>Factor Name:</strong> Key internal/external factors from your IFE and EFE analyses.<br>
+          &bull; <strong>Weight:</strong> 0.00 to 1.00 &mdash; internal weights must sum to 1.00, external weights must sum to 1.00 (two separate pools).<br>
+          &bull; <strong>AS (Attractiveness Score):</strong> 1 = Not attractive, 2 = Somewhat attractive, 3 = Reasonably attractive, 4 = Highly attractive. Leave blank if the factor does not affect the strategy choice.<br>
+          &bull; <strong>WAS (Weighted Attractiveness Score):</strong> Calculated automatically as Weight &times; AS.
+        </div>
+
+        <!-- QSPM Table -->
+        <div class="qspm-section-wrap" id="qspmTableWrap">
+          <!-- Internal Factors Section -->
+          <div class="qspm-section-header" style="background:#eff6ff" id="internalHeader">
+            <div class="dim-dot" style="background:#2563eb"></div>
+            <h3>Key Internal Factors</h3>
+            <span class="dim-abbr" style="background:#dbeafe;color:#1d4ed8">INT</span>
+          </div>
+          <div class="qspm-section-body" id="internalBody">
+            <table class="qspm-table" id="internalTable">
+              <thead id="internalThead"></thead>
+              <tbody id="internalTbody"></tbody>
+            </table>
+            <div class="qspm-section-footer">
+              <button class="add-factor-btn" id="add-internal" onclick="addFactorRow('internal')">
+                <span style="font-size:1.1rem;line-height:1">+</span> Add Internal Factor
+              </button>
+            </div>
+          </div>
+          <div class="weight-total-bar" id="internalWeightBar">
+            <div>
+              <span class="wt-label">Internal Weight Total: </span>
+              <span class="wt-value" id="internalWeightDisplay">0.00 / 1.00</span>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div class="qspm-section-divider"></div>
+
+          <!-- External Factors Section -->
+          <div class="qspm-section-header" style="background:#f0fdf4" id="externalHeader">
+            <div class="dim-dot" style="background:#16a34a"></div>
+            <h3>Key External Factors</h3>
+            <span class="dim-abbr" style="background:#dcfce7;color:#15803d">EXT</span>
+          </div>
+          <div class="qspm-section-body" id="externalBody">
+            <table class="qspm-table" id="externalTable">
+              <thead id="externalThead"></thead>
+              <tbody id="externalTbody"></tbody>
+            </table>
+            <div class="qspm-section-footer">
+              <button class="add-factor-btn" id="add-external" onclick="addFactorRow('external')">
+                <span style="font-size:1.1rem;line-height:1">+</span> Add External Factor
+              </button>
+            </div>
+          </div>
+          <div class="weight-total-bar" id="externalWeightBar">
+            <div>
+              <span class="wt-label">External Weight Total: </span>
+              <span class="wt-value" id="externalWeightDisplay">0.00 / 1.00</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="form-error" style="display:none;"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="goToStep1()">&#8592; Back</button>
+          <button class="btn btn-primary" onclick="generateResults()">Generate Results &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 3 ═══════════ -->
+  <div class="step" id="step3">
+    <!-- Print Header -->
+    <div class="print-only print-header">
+      <h1 id="print-title">QSPM Analysis</h1>
+      <p id="print-meta"></p>
+    </div>
+
+    <!-- Print Validation Alert -->
+    <div class="print-alert" id="printValidationAlert" style="display:none;">
+      <p id="printAlertText"></p>
+    </div>
+
+    <!-- Score Summary Table -->
+    <div class="score-summary">
+      <table class="score-table">
+        <thead id="resultsThead"></thead>
+        <tbody id="scoreTableBody"></tbody>
+        <tbody id="resultsTotalsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-wrap">
+      <div class="chart-topbar">
+        <div class="chart-icon">📊</div>
+        <h3>Strategy Comparison</h3>
+      </div>
+      <div class="chart-body">
+        <canvas id="qspmCanvas" width="700" height="350" style="width:100%;height:auto;"></canvas>
+      </div>
+    </div>
+
+    <!-- Strategy Card -->
+    <div class="strategy-card" id="strategyCard"></div>
+
+    <!-- Action Buttons -->
+    <div class="btn-row no-print">
+      <button class="btn btn-secondary" onclick="goToStep2()">&#8592; Edit Scores</button>
+      <button class="btn btn-secondary" onclick="resetAll()">&#8634; Start Over</button>
+      <button class="btn btn-accent" onclick="window.print()">&#x1F5A8;&#xFE0F; Print / Save PDF</button>
+    </div>
+  </div>
+
+</div><!-- /app-shell -->
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   QSPM Analysis Tool — JavaScript
+   ═══════════════════════════════════════════════════════ */
+
+const MAX_ROWS = 10, MIN_ROWS = 2;
+const MIN_STRATEGIES = 2, MAX_STRATEGIES = 4;
+
+const STRATEGY_COLORS = ['#2563eb', '#7c3aed', '#16a34a', '#ea580c'];
+const STRATEGY_PLACEHOLDERS = [
+  'e.g. Market Penetration',
+  'e.g. Product Development',
+  'e.g. Market Development',
+  'e.g. Diversification'
+];
+
+const INTERNAL_DEFAULTS = [
+  'Strong Brand Reputation',
+  'Proprietary Technology / R&D',
+  'Experienced Management Team'
+];
+const EXTERNAL_DEFAULTS = [
+  'Growing Market Demand',
+  'Favorable Regulatory Environment',
+  'Increasing Competition'
+];
+
+let strategyCount = 2;
+let results = {};
+
+/* ── Set initial date ───────────────────────────── */
+(function() {
+  const now = new Date();
+  const months = ['January','February','March','April','May','June',
+    'July','August','September','October','November','December'];
+  document.getElementById('analysisDate').value =
+    months[now.getMonth()] + ' ' + now.getFullYear();
+})();
+
+/* ── Step Navigation ────────────────────────────── */
+function setStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  for (let i = 1; i <= 3; i++) {
+    const node = document.getElementById('node' + i);
+    node.classList.remove('active','done');
+    if (i < n)      node.classList.add('done');
+    else if (i === n) node.classList.add('active');
+  }
+  const pct = n === 1 ? 16 : n === 2 ? 50 : 92;
+  document.getElementById('progressFill').style.width = pct + '%';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function goToStep1() { setStep(1); }
+function goToStep2() { setStep(2); }
+
+/* ═══════════════════════════════════════════════════════
+   Step 1 — Strategy Name Management
+   ═══════════════════════════════════════════════════════ */
+
+function buildStrategyNames() {
+  const list = document.getElementById('strategyNameList');
+  list.innerHTML = '';
+  for (let i = 0; i < strategyCount; i++) {
+    const row = document.createElement('div');
+    row.className = 'strategy-name-row';
+    row.innerHTML = `
+      <span class="sn-num">${i + 1}</span>
+      <span class="sn-chip" style="background:${STRATEGY_COLORS[i]}"></span>
+      <input type="text" class="strategy-name-input" id="stratName${i}"
+        placeholder="${STRATEGY_PLACEHOLDERS[i]}"
+        aria-label="Strategy ${i + 1} name" maxlength="60">
+      <button class="remove-btn" title="Remove strategy" onclick="removeStrategyName(${i})"
+        ${i < MIN_STRATEGIES ? 'disabled' : ''}>&#10005;</button>
+    `;
+    list.appendChild(row);
+  }
+  updateAddStrategyBtn();
+}
+
+function addStrategyName() {
+  if (strategyCount >= MAX_STRATEGIES) return;
+  strategyCount++;
+  buildStrategyNames();
+  document.getElementById('stratName' + (strategyCount - 1)).focus();
+}
+
+function removeStrategyName(idx) {
+  if (strategyCount <= MIN_STRATEGIES) return;
+  // Save current values
+  const values = [];
+  for (let i = 0; i < strategyCount; i++) {
+    values.push(document.getElementById('stratName' + i).value);
+  }
+  values.splice(idx, 1);
+  strategyCount--;
+  buildStrategyNames();
+  for (let i = 0; i < strategyCount; i++) {
+    document.getElementById('stratName' + i).value = values[i] || '';
+  }
+}
+
+function updateAddStrategyBtn() {
+  const btn = document.getElementById('addStrategyBtn');
+  btn.disabled = strategyCount >= MAX_STRATEGIES;
+}
+
+function getStrategyNames() {
+  const names = [];
+  for (let i = 0; i < strategyCount; i++) {
+    const el = document.getElementById('stratName' + i);
+    names.push(el ? el.value.trim() : '');
+  }
+  return names;
+}
+
+/* ── Step 1 Validation ──────────────────────────── */
+document.getElementById('btnToStep2').onclick = function() {
+  const name = document.getElementById('companyName').value.trim();
+  const errC = document.getElementById('err-company');
+  const errS = document.getElementById('err-strategies');
+  let valid = true;
+
+  // Company name
+  if (!name) {
+    document.getElementById('companyName').classList.add('error');
+    errC.style.display = 'block';
+    valid = false;
+  } else {
+    document.getElementById('companyName').classList.remove('error');
+    errC.style.display = 'none';
+  }
+
+  // Strategy names
+  const names = getStrategyNames();
+  const filledNames = names.filter(n => n.length > 0);
+  if (filledNames.length < MIN_STRATEGIES) {
+    errS.style.display = 'block';
+    valid = false;
+  } else {
+    errS.style.display = 'none';
+  }
+
+  if (!valid) return;
+
+  // Build Step 2 table headers and factor rows based on strategy count
+  buildQSPMTable();
+  setStep(2);
+};
+
+/* ═══════════════════════════════════════════════════════
+   Step 2 — QSPM Table Management
+   ═══════════════════════════════════════════════════════ */
+
+function getActiveStrategyNames() {
+  const names = getStrategyNames();
+  return names.map((n, i) => n || ('Strategy ' + (i + 1)));
+}
+
+function buildTableHeaders(section) {
+  const thead = document.getElementById(section + 'Thead');
+  const names = getActiveStrategyNames();
+  // Top header row: grouped by strategy
+  let topRow = '<tr><th class="th-factor" rowspan="2">Factor Name</th>';
+  topRow += '<th class="th-weight" rowspan="2">Weight</th>';
+  for (let i = 0; i < strategyCount; i++) {
+    topRow += `<th class="th-strat-group" colspan="2" style="color:${STRATEGY_COLORS[i]};border-left:2px solid ${STRATEGY_COLORS[i]}20;">${names[i]}</th>`;
+  }
+  topRow += '<th class="th-del" rowspan="2"></th></tr>';
+
+  // Sub-header row: AS | WAS for each strategy
+  let subRow = '<tr>';
+  for (let i = 0; i < strategyCount; i++) {
+    subRow += `<th class="th-as" style="border-left:2px solid ${STRATEGY_COLORS[i]}20;">AS</th>`;
+    subRow += '<th class="th-was">WAS</th>';
+  }
+  subRow += '</tr>';
+
+  thead.innerHTML = topRow + subRow;
+}
+
+function buildQSPMTable() {
+  buildTableHeaders('internal');
+  buildTableHeaders('external');
+
+  // Only build default rows if tbody is empty (first time)
+  const intBody = document.getElementById('internalTbody');
+  const extBody = document.getElementById('externalTbody');
+
+  if (intBody.children.length === 0) {
+    INTERNAL_DEFAULTS.forEach(label => addFactorRow('internal', label));
+  } else {
+    rebuildExistingRows('internal');
+  }
+  if (extBody.children.length === 0) {
+    EXTERNAL_DEFAULTS.forEach(label => addFactorRow('external', label));
+  } else {
+    rebuildExistingRows('external');
+  }
+  updateAllTotals();
+}
+
+function rebuildExistingRows(section) {
+  // When strategy count changes, rebuild rows preserving existing data
+  const tbody = document.getElementById(section + 'Tbody');
+  const existingRows = [...tbody.querySelectorAll('tr.qspm-factor-row')];
+  const rowData = existingRows.map(tr => {
+    const label = tr.querySelector('.label-input').value;
+    const weight = tr.querySelector('.weight-input').value;
+    const asInputs = tr.querySelectorAll('.as-input');
+    const asValues = [];
+    asInputs.forEach(inp => asValues.push(inp.value));
+    return { label, weight, asValues };
+  });
+
+  tbody.innerHTML = '';
+  rowData.forEach(d => {
+    addFactorRow(section, d.label, d.weight, d.asValues);
+  });
+}
+
+function addFactorRow(section, labelText, weightVal, asVals) {
+  const tbody = document.getElementById(section + 'Tbody');
+  if (tbody.querySelectorAll('tr.qspm-factor-row').length >= MAX_ROWS) return;
+
+  const tr = document.createElement('tr');
+  tr.className = 'qspm-factor-row';
+  tr.style.animation = 'rowIn 0.2s ease';
+
+  const rowNum = tbody.querySelectorAll('tr.qspm-factor-row').length + 1;
+
+  // Factor name cell
+  let html = `<td>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span class="factor-row-num">${rowNum}</span>
+      <input type="text" class="label-input" placeholder="Factor name..."
+        value="${labelText || ''}" maxlength="50" aria-label="${section} factor label">
+    </div>
+  </td>`;
+
+  // Weight cell
+  html += `<td><input type="number" class="weight-input" min="0" max="1" step="0.01"
+    placeholder="0.00" value="${weightVal || ''}" aria-label="Weight"></td>`;
+
+  // AS + WAS cells for each strategy
+  for (let i = 0; i < strategyCount; i++) {
+    const existingAs = (asVals && asVals[i] !== undefined) ? asVals[i] : '';
+    html += `<td style="border-left:2px solid ${STRATEGY_COLORS[i]}10;">
+      <input type="number" class="as-input as-input-s${i}" min="0" max="4" step="1"
+        placeholder="1-4" value="${existingAs}" aria-label="AS for strategy ${i + 1}">
+    </td>`;
+    html += `<td><span class="was-display was-display-s${i}">&mdash;</span></td>`;
+  }
+
+  // Delete button
+  html += `<td><button class="remove-btn" title="Remove factor" onclick="removeFactorRow('${section}', this)">&#10005;</button></td>`;
+
+  tr.innerHTML = html;
+
+  // Attach event listeners
+  tr.querySelector('.weight-input').addEventListener('input', updateAllTotals);
+  tr.querySelectorAll('.as-input').forEach(inp => {
+    inp.addEventListener('input', updateAllTotals);
+  });
+
+  tbody.appendChild(tr);
+  updateFactorRowNumbers(section);
+  updateAddFactorBtn(section);
+  updateAllTotals();
+  if (!labelText) {
+    const labelInp = tr.querySelector('.label-input');
+    if (labelInp) labelInp.focus();
+  }
+}
+
+function removeFactorRow(section, btn) {
+  const tbody = document.getElementById(section + 'Tbody');
+  const tr = btn.closest('tr');
+  if (tbody.querySelectorAll('tr.qspm-factor-row').length <= MIN_ROWS) return;
+  tr.style.cssText = 'opacity:0;transform:translateX(8px);transition:opacity 0.18s,transform 0.18s;';
+  setTimeout(() => {
+    tr.remove();
+    updateFactorRowNumbers(section);
+    updateAddFactorBtn(section);
+    updateAllTotals();
+  }, 190);
+}
+
+function updateFactorRowNumbers(section) {
+  const rows = document.querySelectorAll('#' + section + 'Tbody tr.qspm-factor-row');
+  rows.forEach((tr, i) => {
+    const numEl = tr.querySelector('.factor-row-num');
+    if (numEl) numEl.textContent = i + 1;
+    const delBtn = tr.querySelector('.remove-btn');
+    if (delBtn) delBtn.disabled = (rows.length <= MIN_ROWS);
+  });
+}
+
+function updateAddFactorBtn(section) {
+  const btn = document.getElementById('add-' + section);
+  if (btn) {
+    btn.disabled = document.getElementById(section + 'Tbody')
+      .querySelectorAll('tr.qspm-factor-row').length >= MAX_ROWS;
+  }
+}
+
+/* ── Live Totals & WAS ─────────────────────────── */
+function updateAllTotals() {
+  updateSectionTotals('internal');
+  updateSectionTotals('external');
+}
+
+function updateSectionTotals(section) {
+  const rows = document.querySelectorAll('#' + section + 'Tbody tr.qspm-factor-row');
+  let weightSum = 0;
+
+  rows.forEach(tr => {
+    const w = parseFloat(tr.querySelector('.weight-input').value);
+    if (!isNaN(w)) weightSum += w;
+
+    for (let i = 0; i < strategyCount; i++) {
+      const asInput = tr.querySelector('.as-input-s' + i);
+      const wasDisp = tr.querySelector('.was-display-s' + i);
+      if (!asInput || !wasDisp) continue;
+
+      const as = parseFloat(asInput.value);
+      if (!isNaN(w) && !isNaN(as) && as > 0) {
+        const was = w * as;
+        wasDisp.textContent = was.toFixed(2);
+        wasDisp.style.color = STRATEGY_COLORS[i];
+      } else {
+        wasDisp.innerHTML = '&mdash;';
+        wasDisp.style.color = 'var(--steel)';
+      }
+    }
+  });
+
+  const display = document.getElementById(section + 'WeightDisplay');
+  display.textContent = weightSum.toFixed(2) + ' / 1.00';
+  if (Math.abs(weightSum - 1.0) < 0.005) {
+    display.className = 'wt-value wt-ok';
+  } else {
+    display.className = 'wt-value wt-warn';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Collect Factor Data
+   ═══════════════════════════════════════════════════════ */
+
+function collectFactors(section) {
+  const rows = document.querySelectorAll('#' + section + 'Tbody tr.qspm-factor-row');
+  const factors = [];
+  rows.forEach((tr, idx) => {
+    const label = tr.querySelector('.label-input').value.trim() || ('Factor ' + (idx + 1));
+    const weight = parseFloat(tr.querySelector('.weight-input').value);
+    const asScores = [];
+    for (let i = 0; i < strategyCount; i++) {
+      const asInput = tr.querySelector('.as-input-s' + i);
+      const val = asInput ? parseFloat(asInput.value) : NaN;
+      asScores.push(val);
+    }
+    factors.push({ label, weight, asScores });
+  });
+  return factors;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Generate Results
+   ═══════════════════════════════════════════════════════ */
+
+function generateResults() {
+  const errBox = document.getElementById('form-error');
+  errBox.style.display = 'none';
+  const errors = [];
+
+  const internalFactors = collectFactors('internal');
+  const externalFactors = collectFactors('external');
+
+  // Check minimum factors with valid data (weight + at least one AS)
+  const validInternal = internalFactors.filter(f => !isNaN(f.weight) && f.asScores.some(a => !isNaN(a) && a > 0));
+  const validExternal = externalFactors.filter(f => !isNaN(f.weight) && f.asScores.some(a => !isNaN(a) && a > 0));
+
+  if (validInternal.length < 2) errors.push('Enter at least 2 internal factors with a weight and at least one AS score.');
+  if (validExternal.length < 2) errors.push('Enter at least 2 external factors with a weight and at least one AS score.');
+
+  // Validate AS range (1-4 or blank/0)
+  let asRangeError = false;
+  [...internalFactors, ...externalFactors].forEach(f => {
+    f.asScores.forEach(a => {
+      if (!isNaN(a) && a !== 0 && (a < 1 || a > 4 || a !== Math.round(a))) {
+        asRangeError = true;
+      }
+    });
+  });
+  if (asRangeError) errors.push('Attractiveness Scores must be whole numbers from 1 to 4, or blank/0 (not applicable).');
+
+  if (errors.length) {
+    errBox.innerHTML = errors.join('<br>');
+    errBox.style.display = 'block';
+    return;
+  }
+
+  // Compute weight sums
+  const internalWeightSum = internalFactors.reduce((sum, f) => sum + (isNaN(f.weight) ? 0 : f.weight), 0);
+  const externalWeightSum = externalFactors.reduce((sum, f) => sum + (isNaN(f.weight) ? 0 : f.weight), 0);
+
+  // Compute TAS for each strategy
+  const stratNames = getActiveStrategyNames();
+  const tas = [];
+  for (let i = 0; i < strategyCount; i++) {
+    let total = 0;
+    [...internalFactors, ...externalFactors].forEach(f => {
+      const w = isNaN(f.weight) ? 0 : f.weight;
+      const a = isNaN(f.asScores[i]) ? 0 : f.asScores[i];
+      total += w * a;
+    });
+    tas.push(total);
+  }
+
+  // Check if all AS scores are identical across strategies (comparison warning)
+  let allIdentical = true;
+  [...internalFactors, ...externalFactors].forEach(f => {
+    const validAs = f.asScores.filter(a => !isNaN(a));
+    if (validAs.length > 1) {
+      const first = validAs[0];
+      if (!validAs.every(a => a === first)) allIdentical = false;
+    }
+  });
+
+  // Print validation alert
+  const failures = [];
+  if (Math.abs(internalWeightSum - 1.0) >= 0.005)
+    failures.push('Internal factor weights sum to ' + internalWeightSum.toFixed(2));
+  if (Math.abs(externalWeightSum - 1.0) >= 0.005)
+    failures.push('External factor weights sum to ' + externalWeightSum.toFixed(2));
+
+  const alertDiv = document.getElementById('printValidationAlert');
+  const alertText = document.getElementById('printAlertText');
+  if (failures.length) {
+    alertText.textContent =
+      '\u26A0 RESULTS NOT VALID \u2014 ' + failures.join('; ') +
+      '. Each weight pool must sum to 1.00 for results to be accurate.';
+    alertDiv.style.display = 'block';
+  } else {
+    alertDiv.style.display = 'none';
+  }
+
+  results = {
+    company: document.getElementById('companyName').value.trim(),
+    industry: document.getElementById('companyIndustry').value.trim(),
+    analyst: document.getElementById('analystName').value.trim(),
+    date: document.getElementById('analysisDate').value.trim(),
+    strategyNames: stratNames,
+    strategyCount: strategyCount,
+    internalFactors: internalFactors,
+    externalFactors: externalFactors,
+    internalWeightSum: internalWeightSum,
+    externalWeightSum: externalWeightSum,
+    tas: tas,
+    allIdentical: allIdentical,
+    weightFailures: failures
+  };
+
+  buildScoreTable();
+  drawChart();
+  buildStrategyCard();
+  updatePrintHeader();
+  setStep(3);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Score Table
+   ═══════════════════════════════════════════════════════ */
+
+function buildScoreTable() {
+  const r = results;
+
+  // Build dynamic header
+  const thead = document.getElementById('resultsThead');
+  let thRow = '<tr><th>Factor</th><th>Weight</th>';
+  for (let i = 0; i < r.strategyCount; i++) {
+    thRow += `<th class="th-right" style="color:${STRATEGY_COLORS[i]};">${r.strategyNames[i]}<br><span style="font-size:0.65rem;font-weight:500;color:var(--muted);">AS &times; W = WAS</span></th>`;
+  }
+  thRow += '</tr>';
+  thead.innerHTML = thRow;
+
+  // Build rows
+  const tbody = document.getElementById('scoreTableBody');
+  let html = '';
+
+  // Section header: Internal
+  html += `<tr><td colspan="${2 + r.strategyCount}" style="background:#eff6ff;font-weight:700;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.06em;color:#1d4ed8;padding:10px 20px;">Key Internal Factors</td></tr>`;
+
+  r.internalFactors.forEach(f => {
+    html += buildResultFactorRow(f, r);
+  });
+
+  // Internal weight warning row
+  if (Math.abs(r.internalWeightSum - 1.0) >= 0.005) {
+    html += `<tr><td colspan="${2 + r.strategyCount}" style="background:#fffbeb;color:#b45309;font-size:0.82rem;font-weight:600;padding:10px 20px;">
+      \u26A0 Internal weights sum to ${r.internalWeightSum.toFixed(2)} \u2014 should equal 1.00
+    </td></tr>`;
+  }
+
+  // Section header: External
+  html += `<tr><td colspan="${2 + r.strategyCount}" style="background:#f0fdf4;font-weight:700;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.06em;color:#15803d;padding:10px 20px;">Key External Factors</td></tr>`;
+
+  r.externalFactors.forEach(f => {
+    html += buildResultFactorRow(f, r);
+  });
+
+  // External weight warning row
+  if (Math.abs(r.externalWeightSum - 1.0) >= 0.005) {
+    html += `<tr><td colspan="${2 + r.strategyCount}" style="background:#fffbeb;color:#b45309;font-size:0.82rem;font-weight:600;padding:10px 20px;">
+      \u26A0 External weights sum to ${r.externalWeightSum.toFixed(2)} \u2014 should equal 1.00
+    </td></tr>`;
+  }
+
+  // Comparison warning
+  if (r.allIdentical) {
+    html += `<tr><td colspan="${2 + r.strategyCount}" style="background:#fffbeb;color:#b45309;font-size:0.82rem;font-weight:600;padding:10px 20px;">
+      \u26A0 All AS scores are identical across strategies \u2014 comparison may not be meaningful.
+    </td></tr>`;
+  }
+
+  tbody.innerHTML = html;
+
+  // TAS totals row
+  const maxTas = Math.max(...r.tas);
+  const totalsBody = document.getElementById('resultsTotalsBody');
+  let totalsHtml = '<tr class="coord-row"><td colspan="2"><strong>Total Attractiveness Score (TAS)</strong></td>';
+  for (let i = 0; i < r.strategyCount; i++) {
+    const isWinner = r.tas[i] === maxTas;
+    totalsHtml += `<td style="text-align:center;"><span class="coord-pair">${r.tas[i].toFixed(2)}</span>`;
+    if (isWinner) {
+      totalsHtml += `<span class="winner-badge">\u2B50 Winner</span>`;
+    }
+    totalsHtml += '</td>';
+  }
+  totalsHtml += '</tr>';
+  totalsBody.innerHTML = totalsHtml;
+}
+
+function buildResultFactorRow(f, r) {
+  const w = isNaN(f.weight) ? 0 : f.weight;
+  let html = '<tr>';
+  html += `<td style="font-size:0.85rem;">${f.label}</td>`;
+  html += `<td style="font-size:0.85rem;text-align:center;">${w.toFixed(2)}</td>`;
+  for (let i = 0; i < r.strategyCount; i++) {
+    const a = isNaN(f.asScores[i]) ? 0 : f.asScores[i];
+    const was = w * a;
+    const asText = a > 0 ? a : '\u2014';
+    const wasText = a > 0 ? was.toFixed(2) : '\u2014';
+    html += `<td style="text-align:center;font-size:0.82rem;">
+      <span style="color:var(--muted);">${asText}</span>
+      <span style="margin:0 3px;color:var(--border);">\u00D7</span>
+      <strong style="color:${a > 0 ? STRATEGY_COLORS[i] : 'var(--muted)'};">${wasText}</strong>
+    </td>`;
+  }
+  html += '</tr>';
+  return html;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Canvas Chart — Horizontal Bar
+   ═══════════════════════════════════════════════════════ */
+
+function drawChart() {
+  const canvas = document.getElementById('qspmCanvas');
+  const ctx = canvas.getContext('2d');
+  const r = results;
+
+  const numBars = r.strategyCount;
+  const barH = 48;
+  const gap = 20;
+  const topPad = 40;
+  const bottomPad = 50;
+  const leftPad = 180;
+  const rightPad = 100;
+
+  // Adjust canvas height
+  const neededH = topPad + numBars * (barH + gap) + bottomPad + (r.weightFailures.length ? 50 : 0);
+  canvas.height = Math.max(350, neededH);
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#fafbfc';
+  ctx.fillRect(0, 0, W, H);
+
+  const maxTas = Math.max(...r.tas, 1);
+  const barAreaW = W - leftPad - rightPad;
+  const maxTasWinner = Math.max(...r.tas);
+
+  // Chart title
+  ctx.fillStyle = '#0f2342';
+  ctx.font = 'bold 14px DM Sans, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Total Attractiveness Score (TAS) Comparison', W / 2, 20);
+
+  // Grid lines
+  const xScale = barAreaW / (maxTas * 1.15);
+  const gridStep = maxTas > 4 ? 1 : 0.5;
+  ctx.strokeStyle = '#e2e8f0';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  for (let v = gridStep; v <= maxTas * 1.15; v += gridStep) {
+    const x = leftPad + v * xScale;
+    ctx.beginPath();
+    ctx.moveTo(x, topPad - 5);
+    ctx.lineTo(x, topPad + numBars * (barH + gap));
+    ctx.stroke();
+    // Label
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '500 10px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(v.toFixed(1), x, topPad + numBars * (barH + gap) + 4);
+  }
+  ctx.setLineDash([]);
+
+  // X axis label
+  ctx.fillStyle = '#64748b';
+  ctx.font = '600 11px DM Sans, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText('Total Attractiveness Score', leftPad + barAreaW / 2, topPad + numBars * (barH + gap) + 22);
+
+  // Draw bars
+  for (let i = 0; i < numBars; i++) {
+    const y = topPad + i * (barH + gap);
+    const barW = Math.max(2, r.tas[i] * xScale);
+    const isWinner = r.tas[i] === maxTasWinner;
+
+    // Strategy label
+    ctx.fillStyle = STRATEGY_COLORS[i];
+    ctx.font = '700 12px DM Sans, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    const nameText = r.strategyNames[i].length > 22
+      ? r.strategyNames[i].substring(0, 20) + '...'
+      : r.strategyNames[i];
+    ctx.fillText(nameText, leftPad - 14, y + barH / 2);
+
+    // Bar
+    ctx.fillStyle = STRATEGY_COLORS[i];
+    ctx.globalAlpha = 0.85;
+    roundRect(ctx, leftPad, y, barW, barH, 6);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Bar gradient overlay
+    const grad = ctx.createLinearGradient(leftPad, y, leftPad + barW, y);
+    grad.addColorStop(0, 'rgba(255,255,255,0.15)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    roundRect(ctx, leftPad, y, barW, barH, 6);
+    ctx.fill();
+
+    // TAS value at end of bar
+    ctx.fillStyle = STRATEGY_COLORS[i];
+    ctx.font = 'bold 13px DM Sans, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(r.tas[i].toFixed(2), leftPad + barW + 8, y + barH / 2);
+
+    // Winner badge
+    if (isWinner) {
+      const badgeX = leftPad + barW + 50;
+      const badgeY = y + barH / 2;
+      ctx.fillStyle = '#fef9c3';
+      roundRect(ctx, badgeX, badgeY - 10, 120, 20, 10);
+      ctx.fill();
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1;
+      roundRect(ctx, badgeX, badgeY - 10, 120, 20, 10);
+      ctx.stroke();
+      ctx.fillStyle = '#a16207';
+      ctx.font = 'bold 10px DM Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('\u2B50 RECOMMENDED', badgeX + 60, badgeY);
+    }
+  }
+
+  // Weight warning overlay on canvas
+  if (r.weightFailures.length) {
+    const warnY = topPad + numBars * (barH + gap) + 38;
+    const warnH = 32;
+    const warnX = leftPad - 10;
+    const warnW = barAreaW + rightPad;
+
+    ctx.fillStyle = '#fef2f2';
+    ctx.fillRect(warnX, warnY, warnW, warnH);
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(warnX, warnY, warnW, warnH);
+
+    ctx.fillStyle = '#dc2626';
+    ctx.font = 'bold 11px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      '\u26A0 RESULTS NOT VALID \u2014 ' + r.weightFailures.join('; '),
+      warnX + warnW / 2, warnY + warnH / 2
+    );
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+/* ═══════════════════════════════════════════════════════
+   Strategy Recommendation Card
+   ═══════════════════════════════════════════════════════ */
+
+function buildStrategyCard() {
+  const sc = document.getElementById('strategyCard');
+  const r = results;
+  const maxTas = Math.max(...r.tas);
+
+  // Find winner and runner-up
+  const sorted = r.tas.map((t, i) => ({ tas: t, idx: i, name: r.strategyNames[i] }))
+    .sort((a, b) => b.tas - a.tas);
+  const winner = sorted[0];
+  const runnerUp = sorted[1];
+  const gap = winner.tas - runnerUp.tas;
+
+  let emoji, label, color, tagline, items;
+
+  if (gap === 0) {
+    // Tie
+    emoji = '\u2696\uFE0F';
+    label = 'Strategic Tie';
+    color = '#f59e0b';
+    tagline = `${r.company} faces a strategic tie between ${winner.name} and ${runnerUp.name} \u2014 both score ${winner.tas.toFixed(2)}.`;
+    items = [
+      { icon: '\uD83C\uDFAF', title: 'Evaluate Long-Term Vision Alignment', body: 'When strategies tie, examine which aligns better with your company\'s long-term vision and mission. The strategy most consistent with organizational purpose should take priority.' },
+      { icon: '\uD83D\uDCCA', title: 'Assess Resource Requirements', body: 'Compare the resource demands of each strategy. The one requiring fewer additional resources or leveraging existing capabilities more efficiently may be the better initial choice.' },
+      { icon: '\u23F1\uFE0F', title: 'Consider Sequencing Both', body: 'When strategies tie, consider implementing one now and the other in year 2. Sequencing allows you to capture value from both without overextending resources.' },
+      { icon: '\uD83D\uDEE1\uFE0F', title: 'Analyze Risk Profiles', body: 'Evaluate the risk associated with each tied strategy. In uncertain environments, the lower-risk option may be preferred. In stable environments, the higher-upside option may win.' },
+      { icon: '\uD83D\uDC65', title: 'Seek Stakeholder Input', body: 'When quantitative analysis produces a tie, qualitative input from key stakeholders can break the deadlock. Their insights on implementation feasibility are invaluable.' },
+      { icon: '\uD83D\uDD04', title: 'Conduct Sensitivity Analysis', body: 'Test whether small changes in weights or AS scores break the tie. If one strategy is more robust to changes, it may be the safer choice despite the tie.' }
+    ];
+  } else if (gap >= 0.5) {
+    // Clear winner
+    emoji = '\uD83D\uDE80';
+    label = 'Recommended: ' + winner.name;
+    color = STRATEGY_COLORS[winner.idx];
+    tagline = `${winner.name} is clearly the most attractive strategic option for ${r.company} with a Total Attractiveness Score of ${winner.tas.toFixed(2)}, significantly outperforming ${runnerUp.name} (${runnerUp.tas.toFixed(2)}).`;
+    items = [
+      { icon: '\u2705', title: 'Prioritize Implementation', body: `The QSPM analysis indicates that ${winner.name} best leverages ${r.company}'s key strengths and external opportunities while offering superior returns relative to the investment required.` },
+      { icon: '\uD83D\uDCC5', title: 'Develop Action Timeline', body: `Create a detailed implementation roadmap for ${winner.name} with clear milestones, responsible parties, and deadlines. Immediate first steps build organizational momentum.` },
+      { icon: '\uD83D\uDCB0', title: 'Allocate Resources', body: `Direct primary resources toward ${winner.name}. The significant TAS advantage justifies concentrating investment rather than splitting attention across alternatives.` },
+      { icon: '\uD83D\uDCCF', title: 'Establish KPIs', body: `Define key performance indicators to track ${winner.name}'s progress. Set quarterly review points to ensure the strategy is delivering expected results.` },
+      { icon: '\uD83D\uDD04', title: 'Monitor & Adapt', body: `While ${winner.name} is the clear choice, maintain awareness of changing conditions. If key factors shift significantly, reassess the QSPM with updated scores.` },
+      { icon: '\uD83D\uDCCB', title: 'Keep Alternatives Ready', body: `Document ${runnerUp.name} as a contingency. If market conditions change or ${winner.name} underperforms, having a pre-analyzed backup strategy accelerates pivoting.` }
+    ];
+  } else {
+    // Close race
+    emoji = '\uD83E\uDD14';
+    label = 'Slight Edge: ' + winner.name;
+    color = STRATEGY_COLORS[winner.idx];
+    tagline = `${winner.name} edges out as the top strategic option for ${r.company} with a TAS of ${winner.tas.toFixed(2)} versus ${runnerUp.name} at ${runnerUp.tas.toFixed(2)}, though the margin is narrow.`;
+    items = [
+      { icon: '\u2696\uFE0F', title: 'Proceed with Caution', body: `The close scores suggest both ${winner.name} and ${runnerUp.name} have merit. Consider implementing ${winner.name} first while keeping ${runnerUp.name} as a near-term secondary initiative.` },
+      { icon: '\uD83D\uDD0D', title: 'Examine Critical Differentiators', body: `Identify which specific factors gave ${winner.name} its edge. Understanding the key differentiating factors helps validate whether the advantage is sustainable.` },
+      { icon: '\uD83D\uDCCA', title: 'Conduct Sensitivity Analysis', body: `With such a narrow margin, test whether small changes in weights or AS scores would reverse the ranking. If ${winner.name} is sensitive to minor changes, the recommendation is less robust.` },
+      { icon: '\uD83C\uDFAF', title: 'Consider Hybrid Approach', body: `A narrow TAS gap may signal that elements of both strategies can be combined. Explore whether a phased or hybrid approach captures the best of both alternatives.` },
+      { icon: '\uD83D\uDCC5', title: 'Set Review Milestones', body: `Because the margin is slim, build in early review points after implementation begins. Be prepared to pivot to ${runnerUp.name} if initial results disappoint.` },
+      { icon: '\uD83D\uDC65', title: 'Build Consensus', body: `A narrow quantitative edge means qualitative factors carry more weight. Engage leadership and key stakeholders to validate that ${winner.name} has organizational support.` }
+    ];
+  }
+
+  sc.innerHTML = `
+    <div class="strategy-header">
+      <div class="icon-big">${emoji}</div>
+      <div>
+        <h3>Strategic Position: ${label}</h3>
+        <p>${tagline}</p>
+      </div>
+    </div>
+    <div class="strategy-grid">
+      ${items.map(s => `
+        <div class="strategy-item">
+          <h4 style="color:${color}">${s.icon} ${s.title}</h4>
+          <p>${s.body}</p>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+/* ── Print Header ───────────────────────────────── */
+function updatePrintHeader() {
+  document.getElementById('print-title').textContent =
+    'QSPM Analysis \u2014 ' + results.company;
+  let meta = [];
+  if (results.industry) meta.push(results.industry);
+  if (results.analyst)  meta.push('Analyst: ' + results.analyst);
+  if (results.date)     meta.push(results.date);
+  meta.push('Strategies: ' + results.strategyNames.join(', '));
+  document.getElementById('print-meta').textContent = meta.join('  |  ');
+}
+
+/* ── Reset All ──────────────────────────────────── */
+function resetAll() {
+  results = {};
+  strategyCount = 2;
+  ['companyName','companyIndustry','analystName','analysisDate']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  // Clear factor tables
+  document.getElementById('internalTbody').innerHTML = '';
+  document.getElementById('externalTbody').innerHTML = '';
+  document.getElementById('internalWeightDisplay').textContent = '0.00 / 1.00';
+  document.getElementById('internalWeightDisplay').className = 'wt-value wt-warn';
+  document.getElementById('externalWeightDisplay').textContent = '0.00 / 1.00';
+  document.getElementById('externalWeightDisplay').className = 'wt-value wt-warn';
+  buildStrategyNames();
+  // Reset date
+  const now = new Date();
+  const months = ['January','February','March','April','May','June',
+    'July','August','September','October','November','December'];
+  document.getElementById('analysisDate').value = months[now.getMonth()] + ' ' + now.getFullYear();
+  setStep(1);
+}
+
+/* ── Initialize ─────────────────────────────────── */
+buildStrategyNames();
+</script>
+</body>
+</html>

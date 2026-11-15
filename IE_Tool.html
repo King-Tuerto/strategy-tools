@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IE Matrix Analysis Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens ──────────────────────────────── */
+:root {
+  --navy:   #0f2342;
+  --cobalt: #1a3a6e;
+  --sky:    #2563eb;
+  --steel:  #64748b;
+  --cloud:  #f1f5f9;
+  --white:  #ffffff;
+  --accent: #f59e0b;
+  --green:  #10b981;
+  --red:    #ef4444;
+  --orange: #f97316;
+  --text:   #1e293b;
+  --muted:  #94a3b8;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow:    0 4px 24px rgba(15,35,66,0.10);
+  --shadow-lg: 0 12px 48px rgba(15,35,66,0.16);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif; color: var(--text);
+  background: var(--navy);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(37,99,235,0.25) 0%, transparent 60%),
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px);
+  min-height: 100vh; line-height: 1.7;
+}
+.app-shell { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; }
+
+/* ── App Header ─────────────────────────────────── */
+.app-header { text-align: center; margin-bottom: 48px; }
+.app-header .eyebrow {
+  display: inline-block; background: rgba(37,99,235,0.25); color: #93c5fd;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(147,197,253,0.25); margin-bottom: 20px;
+}
+.app-header h1 { font-family: 'DM Serif Display', serif; font-size: clamp(2.2rem,5vw,3.4rem); color: var(--white); line-height: 1.1; margin-bottom: 14px; }
+.app-header h1 em { font-style: italic; color: #93c5fd; }
+.app-header p { color: #94a3b8; font-size: 1.05rem; max-width: 520px; margin: 0 auto; line-height: 1.7; font-weight: 300; }
+
+/* ── Progress Bar ───────────────────────────────── */
+.progress-bar-wrap { display: flex; align-items: center; margin-bottom: 40px; position: relative; }
+.progress-bar-wrap::before { content:''; position: absolute; top: 18px; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.08); z-index: 0; }
+.progress-bar-fill { position: absolute; top: 18px; left: 0; height: 2px; background: var(--sky); z-index: 1; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+.step-node { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative; z-index: 2; }
+.step-node .bubble { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: var(--muted); transition: all 0.3s ease; }
+.step-node.active .bubble { background: var(--sky); border-color: var(--sky); color: white; box-shadow: 0 0 0 4px rgba(37,99,235,0.25); }
+.step-node.done .bubble { background: var(--green); border-color: var(--green); color: white; }
+.step-node .step-label { font-size: 0.7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; transition: color 0.3s; }
+.step-node.active .step-label { color: #93c5fd; }
+.step-node.done .step-label { color: var(--green); }
+
+/* ── Card ───────────────────────────────────────── */
+.card { background: var(--white); border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; animation: slideUp 0.4s cubic-bezier(0.4,0,0.2,1); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.card-header { background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%); padding: 28px 36px; display: flex; align-items: center; gap: 16px; }
+.card-header h2 { font-family: 'DM Serif Display', serif; color: white; font-size: 1.5rem; }
+.card-header p { color: #94a3b8; font-size: 0.85rem; margin-top: 4px; font-weight: 300; }
+.card-header .icon { width: 48px; height: 48px; background: rgba(255,255,255,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+.card-body { padding: 36px; }
+.step { display: none; } .step.active { display: block; }
+
+/* ── Form ───────────────────────────────────────── */
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--steel); margin-bottom: 8px; }
+input[type="text"], input[type="number"], textarea { width: 100%; padding: 13px 16px; border: 2px solid var(--border); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 1rem; color: var(--text); background: var(--cloud); transition: border-color 0.2s, box-shadow 0.2s; outline: none; }
+input:focus, textarea:focus { border-color: var(--sky); box-shadow: 0 0 0 4px rgba(37,99,235,0.12); background: white; }
+input.error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(239,68,68,0.12); }
+.error-msg { font-size: 0.8rem; color: var(--red); margin-top: 5px; font-weight: 500; display: none; }
+
+/* ── Buttons ────────────────────────────────────── */
+.btn { padding: 13px 28px; border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 700; cursor: pointer; border: 2px solid transparent; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 8px; }
+.btn-primary { background: var(--sky); color: white; box-shadow: 0 4px 16px rgba(37,99,235,0.30); }
+.btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(37,99,235,0.35); }
+.btn-secondary { background: transparent; color: var(--steel); border-color: var(--border); }
+.btn-secondary:hover { background: var(--cloud); color: var(--text); }
+.btn-accent { background: var(--accent); color: white; box-shadow: 0 4px 16px rgba(245,158,11,0.30); }
+.btn-accent:hover { background: #d97706; transform: translateY(-1px); }
+.btn-row { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; margin-top: 28px; }
+.hint-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 20px; margin-bottom: 28px; font-size: 0.85rem; color: #1e40af; line-height: 1.7; }
+
+/* ── Division Entry ────────────────────────────── */
+.division-list { margin-bottom: 20px; }
+.division-row { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; animation: rowIn 0.2s ease; }
+@keyframes rowIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+.division-row .row-num { font-size: 0.75rem; font-weight: 700; color: var(--muted); width: 20px; text-align: right; flex-shrink: 0; }
+.division-row input[type="text"] { flex: 1; padding: 10px 14px !important; font-size: 0.9rem !important; }
+.division-row input[type="number"] { width: 100px !important; text-align: center !important; padding: 10px 8px !important; font-size: 0.9rem !important; }
+.remove-btn { width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s; flex-shrink: 0; }
+.remove-btn:hover { background: #fee2e2; color: var(--red); }
+.remove-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+.add-btn { display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 700; color: var(--sky); background: rgba(37,99,235,0.08); border: 1.5px dashed rgba(37,99,235,0.3); border-radius: 8px; padding: 6px 12px; cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+.add-btn:hover { background: rgba(37,99,235,0.15); border-color: var(--sky); }
+.add-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.div-col-headers { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.div-col-headers span { font-size: 0.68rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.div-col-headers .dch-num { width: 20px; flex-shrink: 0; }
+.div-col-headers .dch-name { flex: 1; }
+.div-col-headers .dch-score { width: 100px; text-align: center; flex-shrink: 0; }
+.div-col-headers .dch-del { width: 28px; flex-shrink: 0; }
+
+/* ── Results ────────────────────────────────────── */
+.score-summary { background: white; border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px; }
+.score-table { width: 100%; border-collapse: collapse; }
+.score-table th { background: var(--cloud); padding: 12px 20px; text-align: left; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--steel); border-bottom: 2px solid var(--border); }
+.score-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.score-table tr:last-child td { border-bottom: none; }
+.score-chip { display: inline-flex; align-items: center; justify-content: center; padding: 3px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 700; }
+.coord-row { background: var(--navy); }
+.coord-row td { border-bottom: none !important; padding: 16px 20px; color: white; }
+.zone-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; }
+
+/* ── Chart ──────────────────────────────────────── */
+.chart-wrap { background: white; border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; margin-bottom: 28px; }
+.chart-topbar { background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%); padding: 20px 28px; display: flex; align-items: center; gap: 12px; }
+.chart-topbar h3 { font-family: 'DM Serif Display', serif; color: white; font-size: 1.15rem; }
+.chart-topbar .chart-icon { width: 40px; height: 40px; background: rgba(255,255,255,0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+.chart-topbar .quadrant-badge { padding: 6px 16px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-left: auto; }
+.chart-body { padding: 24px; text-align: center; }
+canvas#ieCanvas { display: block; width: 100%; max-width: 700px; margin: 0 auto; }
+
+/* ── Strategy Card ─────────────────────────────── */
+.strategy-card { background: white; border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px; }
+.strategy-header { padding: 24px 28px 20px; border-bottom: 2px solid var(--border); display: flex; align-items: flex-start; gap: 16px; }
+.strategy-header .icon-big { font-size: 2rem; line-height: 1; }
+.strategy-header h3 { font-family: 'DM Serif Display', serif; font-size: 1.3rem; color: var(--text); margin-bottom: 4px; }
+.strategy-header p { color: var(--steel); font-size: 0.88rem; line-height: 1.6; }
+.strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.strategy-item { padding: 20px 24px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); transition: background 0.15s; }
+.strategy-item:hover { background: var(--cloud); }
+.strategy-item:nth-child(even) { border-right: none; }
+.strategy-item:nth-last-child(-n+2) { border-bottom: none; }
+.strategy-item h4 { font-size: 0.88rem; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.strategy-item p { font-size: 0.82rem; color: var(--steel); line-height: 1.6; }
+
+/* ── Print ──────────────────────────────────────── */
+.print-only { display: none; }
+@media print {
+  body { background: white !important; color: black; }
+  @page { margin: 1.5cm; }
+  .app-header, .progress-bar-wrap, .no-print, #step1, #step2 { display: none !important; }
+  .print-only { display: block !important; }
+  #step3 { display: block !important; }
+  .card, .chart-wrap, .score-summary, .strategy-card { box-shadow: none !important; border: 1px solid #ddd; }
+  .card-header, .chart-topbar { background: #1a3a6e !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .app-shell { padding: 0; max-width: 100%; }
+  canvas { max-width: 500px; margin: 0 auto; display: block; }
+  .strategy-item { break-inside: avoid; }
+  .score-summary { break-inside: avoid; }
+  .chart-wrap { break-inside: avoid; }
+  .strategy-grid { grid-template-columns: 1fr 1fr; }
+  .print-header { text-align: center; padding: 20px 0 30px; border-bottom: 3px solid #1a3a6e; margin-bottom: 24px; }
+  .print-header h1 { font-size: 1.8rem; color: #1a3a6e; font-family: 'DM Serif Display', serif; }
+  .print-header p { color: #666; font-size: 0.9rem; margin-top: 6px; }
+}
+@media (max-width: 620px) { .strategy-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <div class="app-header no-print">
+    <div class="eyebrow">Strategic Management Tool</div>
+    <h1>IE Matrix <em>Analysis</em></h1>
+    <p>Plot your company on the Internal-External Matrix using IFE and EFE scores to determine the appropriate strategic direction.</p>
+  </div>
+
+  <div class="progress-bar-wrap no-print" id="progressBar">
+    <div class="progress-bar-fill" id="progressFill" style="width:16%"></div>
+    <div class="step-node active" id="node1"><div class="bubble">1</div><span class="step-label">Company</span></div>
+    <div class="step-node" id="node2"><div class="bubble">2</div><span class="step-label">Scores</span></div>
+    <div class="step-node" id="node3"><div class="bubble">3</div><span class="step-label">Results</span></div>
+  </div>
+
+  <!-- ═══════════ STEP 1 ═══════════ -->
+  <div class="step active" id="step1">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">🏢</div>
+        <div><h2>Company Information</h2><p>Identify the organization being analyzed</p></div>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="companyName">Company Name *</label>
+          <input type="text" id="companyName" placeholder="e.g. Apple Inc." aria-label="Company Name">
+          <div class="error-msg" id="err-company">Please enter a company name to continue.</div>
+        </div>
+        <div class="form-group">
+          <label for="companyIndustry">Industry / Sector</label>
+          <input type="text" id="companyIndustry" placeholder="e.g. Consumer Electronics" aria-label="Industry or Sector">
+        </div>
+        <div class="form-group">
+          <label for="analystName">Analyst Name</label>
+          <input type="text" id="analystName" placeholder="e.g. Jane Smith" aria-label="Analyst Name">
+        </div>
+        <div class="form-group">
+          <label for="analysisDate">Date</label>
+          <input type="text" id="analysisDate" placeholder="" aria-label="Analysis Date">
+        </div>
+
+        <div class="hint-box">
+          <strong>How the IE Matrix works:</strong><br>
+          The IE Matrix plots your company using two scores: the <strong>IFE Total Weighted Score</strong> (X axis) and the <strong>EFE Total Weighted Score</strong> (Y axis). Both scores range from <strong>1.0 to 4.0</strong>. The matrix is divided into 9 cells grouped into three strategic zones:<br>
+          &bull; <strong>Zone 1 (Grow &amp; Build)</strong> &mdash; Cells I, II, IV<br>
+          &bull; <strong>Zone 2 (Hold &amp; Maintain)</strong> &mdash; Cells III, V, VII<br>
+          &bull; <strong>Zone 3 (Harvest &amp; Divest)</strong> &mdash; Cells VI, VIII, IX
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnToStep2">Continue to Scores &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 2 ═══════════ -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">📊</div>
+        <div><h2>IFE &amp; EFE Scores</h2><p>Enter the total weighted scores from your IFE and EFE analyses</p></div>
+      </div>
+      <div class="card-body">
+        <div class="hint-box">
+          <strong>📘 How to use this tool:</strong><br>
+          &bull; Enter the <strong>Total Weighted Score</strong> from your IFE and EFE matrices. Scores range from 1.0 to 4.0.<br>
+          &bull; Optionally, add multiple <strong>divisions</strong> if analyzing a multi-division company. Each division gets its own IFE and EFE score and is plotted separately.<br>
+          &bull; The matrix determines which strategic zone applies: Grow &amp; Build, Hold &amp; Maintain, or Harvest &amp; Divest.
+        </div>
+
+        <div class="division-list" id="divisionList">
+          <div class="div-col-headers">
+            <span class="dch-num"></span>
+            <span class="dch-name">Division Name</span>
+            <span class="dch-score">IFE Score</span>
+            <span class="dch-score">EFE Score</span>
+            <span class="dch-del"></span>
+          </div>
+          <div id="divRows"></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:10px;">
+            <button class="add-btn" id="addDivBtn" onclick="addDivision()">
+              <span style="font-size:1.1rem;line-height:1">+</span> Add Division
+            </button>
+          </div>
+        </div>
+
+        <div id="form-error" style="display:none; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:20px; color:#dc2626; font-size:0.85rem; font-weight:500;"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="goToStep1()">&larr; Back</button>
+          <button class="btn btn-primary" onclick="generateResults()">Generate Results &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 3 ═══════════ -->
+  <div class="step" id="step3">
+    <div class="print-only print-header">
+      <h1 id="print-title">IE Matrix Analysis</h1>
+      <p id="print-meta"></p>
+    </div>
+
+    <!-- Score Summary -->
+    <div class="score-summary">
+      <table class="score-table">
+        <thead>
+          <tr>
+            <th>Division</th>
+            <th>IFE Score</th>
+            <th>EFE Score</th>
+            <th>Cell</th>
+            <th>Zone</th>
+          </tr>
+        </thead>
+        <tbody id="scoreTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-wrap">
+      <div class="chart-topbar">
+        <div class="chart-icon">📊</div>
+        <h3>Internal-External Matrix</h3>
+        <span class="quadrant-badge" id="zoneBadge"></span>
+      </div>
+      <div class="chart-body">
+        <canvas id="ieCanvas" width="700" height="600"></canvas>
+      </div>
+    </div>
+
+    <!-- Strategy Card -->
+    <div class="strategy-card" id="strategyCard"></div>
+
+    <div class="btn-row no-print">
+      <button class="btn btn-secondary" onclick="goToStep2()">&larr; Edit Scores</button>
+      <button class="btn btn-secondary" onclick="resetAll()">↺ Start Over</button>
+      <button class="btn btn-accent" onclick="window.print()">🖨️ Print / Save PDF</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   IE Matrix Tool — JavaScript
+   ═══════════════════════════════════════════════════════ */
+
+const MAX_DIVS = 5, MIN_DIVS = 1;
+const DIV_COLORS = ['#2563eb','#7c3aed','#16a34a','#ea580c','#dc2626'];
+
+let results = {};
+
+/* ── Date ───────────────────────────────────────── */
+(function() {
+  const now = new Date();
+  const m = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('analysisDate').value = m[now.getMonth()] + ' ' + now.getFullYear();
+})();
+
+/* ── Navigation ─────────────────────────────────── */
+function setStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  for (let i = 1; i <= 3; i++) {
+    const node = document.getElementById('node' + i);
+    node.classList.remove('active','done');
+    if (i < n) node.classList.add('done');
+    else if (i === n) node.classList.add('active');
+  }
+  document.getElementById('progressFill').style.width = (n === 1 ? 16 : n === 2 ? 50 : 92) + '%';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function goToStep1() { setStep(1); }
+function goToStep2() { setStep(2); }
+
+/* ── Step 1 Validation ──────────────────────────── */
+document.getElementById('btnToStep2').onclick = function() {
+  const name = document.getElementById('companyName').value.trim();
+  const err = document.getElementById('err-company');
+  if (!name) { document.getElementById('companyName').classList.add('error'); err.style.display = 'block'; return; }
+  document.getElementById('companyName').classList.remove('error'); err.style.display = 'none';
+  setStep(2);
+};
+
+/* ── Division Rows ─────────────────────────────── */
+function addDivision(nameVal) {
+  const list = document.getElementById('divRows');
+  if (list.querySelectorAll('.division-row').length >= MAX_DIVS) return;
+
+  const row = document.createElement('div');
+  row.className = 'division-row';
+
+  const num = document.createElement('span');
+  num.className = 'row-num';
+  num.textContent = list.querySelectorAll('.division-row').length + 1;
+
+  const nameIn = document.createElement('input');
+  nameIn.type = 'text'; nameIn.placeholder = 'Division / company name...';
+  nameIn.value = nameVal || '';
+  nameIn.maxLength = 40;
+  nameIn.setAttribute('aria-label', 'Division name');
+
+  const ifeIn = document.createElement('input');
+  ifeIn.type = 'number'; ifeIn.className = 'ife-input';
+  ifeIn.min = 1; ifeIn.max = 4; ifeIn.step = 0.01;
+  ifeIn.placeholder = '1.00–4.00';
+  ifeIn.setAttribute('aria-label', 'IFE score');
+
+  const efeIn = document.createElement('input');
+  efeIn.type = 'number'; efeIn.className = 'efe-input';
+  efeIn.min = 1; efeIn.max = 4; efeIn.step = 0.01;
+  efeIn.placeholder = '1.00–4.00';
+  efeIn.setAttribute('aria-label', 'EFE score');
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'remove-btn'; delBtn.title = 'Remove division';
+  delBtn.innerHTML = '✕';
+  delBtn.onclick = () => removeDivision(row);
+
+  row.append(num, nameIn, ifeIn, efeIn, delBtn);
+  list.appendChild(row);
+  updateDivNums();
+  if (!nameVal) nameIn.focus();
+}
+
+function removeDivision(rowEl) {
+  const list = document.getElementById('divRows');
+  if (list.querySelectorAll('.division-row').length <= MIN_DIVS) return;
+  rowEl.style.cssText = 'opacity:0;transform:translateX(8px);transition:opacity 0.18s,transform 0.18s;';
+  setTimeout(() => { rowEl.remove(); updateDivNums(); }, 190);
+}
+
+function updateDivNums() {
+  const rows = document.querySelectorAll('#divRows .division-row');
+  rows.forEach((r, i) => {
+    r.querySelector('.row-num').textContent = i + 1;
+    r.querySelector('.remove-btn').disabled = (rows.length <= MIN_DIVS);
+  });
+  const btn = document.getElementById('addDivBtn');
+  if (btn) btn.disabled = rows.length >= MAX_DIVS;
+}
+
+/* ── Cell & Zone Lookup ────────────────────────── */
+function getCell(ife, efe) {
+  const col = ife >= 3.0 ? 0 : ife >= 2.0 ? 1 : 2;
+  const row = efe >= 3.0 ? 0 : efe >= 2.0 ? 1 : 2;
+  const cells = [
+    ['I','II','III'],
+    ['IV','V','VI'],
+    ['VII','VIII','IX']
+  ];
+  return cells[row][col];
+}
+
+function getZone(cell) {
+  if (['I','II','IV'].includes(cell)) return { zone: 1, name: 'Grow & Build', color: '#16a34a', bg: 'rgba(22,163,74,0.12)' };
+  if (['III','V','VII'].includes(cell)) return { zone: 2, name: 'Hold & Maintain', color: '#2563eb', bg: 'rgba(37,99,235,0.12)' };
+  return { zone: 3, name: 'Harvest & Divest', color: '#dc2626', bg: 'rgba(220,38,38,0.10)' };
+}
+
+/* ── Generate Results ───────────────────────────── */
+function generateResults() {
+  const errBox = document.getElementById('form-error');
+  errBox.style.display = 'none';
+  const errors = [];
+
+  const rows = document.querySelectorAll('#divRows .division-row');
+  const divisions = [];
+
+  rows.forEach((row, i) => {
+    const name = row.querySelector('input[type="text"]').value.trim() || 'Division ' + (i + 1);
+    const ife = parseFloat(row.querySelector('.ife-input').value);
+    const efe = parseFloat(row.querySelector('.efe-input').value);
+
+    if (isNaN(ife) || isNaN(efe)) return;
+
+    if (ife < 1 || ife > 4) { errors.push(name + ': IFE score must be between 1.00 and 4.00.'); return; }
+    if (efe < 1 || efe > 4) { errors.push(name + ': EFE score must be between 1.00 and 4.00.'); return; }
+
+    const cell = getCell(ife, efe);
+    const zoneInfo = getZone(cell);
+    divisions.push({ name, ife, efe, cell, ...zoneInfo, color: DIV_COLORS[i % DIV_COLORS.length] });
+  });
+
+  if (divisions.length === 0) errors.push('Enter at least one division with valid IFE and EFE scores (1.00–4.00).');
+
+  if (errors.length) { errBox.innerHTML = errors.join('<br>'); errBox.style.display = 'block'; return; }
+
+  results = {
+    company: document.getElementById('companyName').value.trim(),
+    industry: document.getElementById('companyIndustry').value.trim(),
+    analyst: document.getElementById('analystName').value.trim(),
+    date: document.getElementById('analysisDate').value.trim(),
+    divisions: divisions,
+    primaryDiv: divisions[0]
+  };
+
+  buildScoreTable();
+  drawChart();
+  buildStrategyCard();
+  updatePrintHeader();
+  setStep(3);
+}
+
+/* ── Score Table ────────────────────────────────── */
+function buildScoreTable() {
+  const tbody = document.getElementById('scoreTableBody');
+  tbody.innerHTML = results.divisions.map(d => `
+    <tr>
+      <td><strong style="color:${d.color}">${d.name}</strong></td>
+      <td><span class="score-chip" style="background:#2563eb20;color:#2563eb;">${d.ife.toFixed(2)}</span></td>
+      <td><span class="score-chip" style="background:#ea580c20;color:#ea580c;">${d.efe.toFixed(2)}</span></td>
+      <td style="font-family:'DM Serif Display',serif;font-size:1.1rem;">Cell ${d.cell}</td>
+      <td><span class="zone-badge" style="background:${d.bg};color:${d.color.replace(')','')};">${d.name === results.primaryDiv.name ? '● ' : ''}${d.zoneName || d.name}</span></td>
+    </tr>
+  `).join('').replace(/undefined/g, '') ;
+
+  // Fix zone name display
+  tbody.innerHTML = results.divisions.map(d => {
+    const zi = getZone(d.cell);
+    return `<tr>
+      <td><strong style="color:${d.color}">${d.name}</strong></td>
+      <td><span class="score-chip" style="background:#2563eb20;color:#2563eb;">${d.ife.toFixed(2)}</span></td>
+      <td><span class="score-chip" style="background:#ea580c20;color:#ea580c;">${d.efe.toFixed(2)}</span></td>
+      <td style="font-family:'DM Serif Display',serif;font-size:1.1rem;">Cell ${d.cell}</td>
+      <td><span class="zone-badge" style="background:${zi.bg};color:${zi.color};">Zone ${zi.zone}: ${zi.name}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── Canvas Chart — 9-Cell IE Matrix ───────────── */
+function drawChart() {
+  const canvas = document.getElementById('ieCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 700, H = 600;
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 60, right: 40, bottom: 60, left: 70 };
+  const gw = W - pad.left - pad.right; // grid width
+  const gh = H - pad.top - pad.bottom;  // grid height
+  const cellW = gw / 3;
+  const cellH = gh / 3;
+
+  // Background
+  ctx.fillStyle = '#fafbfc';
+  ctx.fillRect(0, 0, W, H);
+
+  // Zone colors for each cell
+  const cellMap = [
+    // Row 0 (High EFE: 3.0-4.0), cols: Strong IFE, Average IFE, Weak IFE
+    [{ cell:'I', zone:1 }, { cell:'II', zone:1 }, { cell:'III', zone:2 }],
+    // Row 1 (Medium EFE: 2.0-2.99)
+    [{ cell:'IV', zone:1 }, { cell:'V', zone:2 }, { cell:'VI', zone:3 }],
+    // Row 2 (Low EFE: 1.0-1.99)
+    [{ cell:'VII', zone:2 }, { cell:'VIII', zone:3 }, { cell:'IX', zone:3 }]
+  ];
+  const zoneColors = {
+    1: { fill: 'rgba(22,163,74,0.12)', text: '#16a34a', label: 'Grow & Build' },
+    2: { fill: 'rgba(37,99,235,0.10)', text: '#2563eb', label: 'Hold & Maintain' },
+    3: { fill: 'rgba(220,38,38,0.08)', text: '#dc2626', label: 'Harvest & Divest' }
+  };
+
+  // Draw cells
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      const x = pad.left + c * cellW;
+      const y = pad.top + r * cellH;
+      const info = cellMap[r][c];
+      const zc = zoneColors[info.zone];
+
+      // Fill
+      ctx.fillStyle = zc.fill;
+      ctx.fillRect(x, y, cellW, cellH);
+
+      // Border
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, cellW, cellH);
+
+      // Cell number (Roman)
+      ctx.fillStyle = zc.text;
+      ctx.globalAlpha = 0.5;
+      ctx.font = 'bold 28px DM Serif Display, serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(info.cell, x + cellW / 2, y + cellH / 2 - 12);
+
+      // Zone label
+      ctx.font = '500 11px DM Sans, sans-serif';
+      ctx.fillText(zc.label, x + cellW / 2, y + cellH / 2 + 14);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Outer border
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(pad.left, pad.top, gw, gh);
+
+  // Major dividers (thicker)
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#475569';
+  for (let i = 1; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(pad.left + i * cellW, pad.top);
+    ctx.lineTo(pad.left + i * cellW, pad.top + gh);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pad.left, pad.top + i * cellH);
+    ctx.lineTo(pad.left + gw, pad.top + i * cellH);
+    ctx.stroke();
+  }
+
+  // X-Axis labels (IFE — reversed: Strong on LEFT)
+  ctx.fillStyle = '#1e293b';
+  ctx.font = 'bold 12px DM Sans, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('IFE TOTAL WEIGHTED SCORES', pad.left + gw / 2, 20);
+
+  ctx.font = '600 10px DM Sans, sans-serif';
+  ctx.fillStyle = '#64748b';
+  ctx.fillText('Strong (3.0\u20134.0)', pad.left + cellW / 2, 38);
+  ctx.fillText('Average (2.0\u20132.99)', pad.left + cellW * 1.5, 38);
+  ctx.fillText('Weak (1.0\u20131.99)', pad.left + cellW * 2.5, 38);
+
+  // Score ticks on X axis
+  ctx.font = '10px DM Sans, sans-serif';
+  ctx.fillStyle = '#94a3b8';
+  ctx.textAlign = 'center';
+  for (let v = 1.0; v <= 4.0; v += 0.5) {
+    const x = pad.left + gw - ((v - 1.0) / 3.0) * gw;
+    ctx.fillText(v.toFixed(1), x, pad.top + gh + 18);
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(x, pad.top + gh); ctx.lineTo(x, pad.top + gh + 6); ctx.stroke();
+  }
+
+  // Y-Axis labels (EFE)
+  ctx.save();
+  ctx.fillStyle = '#1e293b';
+  ctx.font = 'bold 12px DM Sans, sans-serif';
+  ctx.translate(16, pad.top + gh / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.fillText('EFE TOTAL WEIGHTED SCORES', 0, 0);
+  ctx.restore();
+
+  ctx.font = '600 10px DM Sans, sans-serif';
+  ctx.fillStyle = '#64748b';
+  ctx.textAlign = 'right';
+  ctx.fillText('High', pad.left - 10, pad.top + cellH / 2 - 6);
+  ctx.fillText('(3.0\u20134.0)', pad.left - 10, pad.top + cellH / 2 + 8);
+  ctx.fillText('Medium', pad.left - 10, pad.top + cellH * 1.5 - 6);
+  ctx.fillText('(2.0\u20132.99)', pad.left - 10, pad.top + cellH * 1.5 + 8);
+  ctx.fillText('Low', pad.left - 10, pad.top + cellH * 2.5 - 6);
+  ctx.fillText('(1.0\u20131.99)', pad.left - 10, pad.top + cellH * 2.5 + 8);
+
+  // Score ticks on Y axis
+  ctx.font = '10px DM Sans, sans-serif';
+  ctx.fillStyle = '#94a3b8';
+  ctx.textAlign = 'right';
+  for (let v = 1.0; v <= 4.0; v += 0.5) {
+    const y = pad.top + gh - ((v - 1.0) / 3.0) * gh;
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(pad.left - 6, y); ctx.lineTo(pad.left, y); ctx.stroke();
+  }
+
+  // Plot divisions
+  results.divisions.forEach((d, i) => {
+    // X: IFE — reversed (4.0 on left, 1.0 on right)
+    const px = pad.left + gw - ((d.ife - 1.0) / 3.0) * gw;
+    // Y: EFE (4.0 on top, 1.0 on bottom)
+    const py = pad.top + gh - ((d.efe - 1.0) / 3.0) * gh;
+
+    // Shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.2)';
+    ctx.shadowBlur = 8;
+
+    // Circle
+    const radius = results.divisions.length === 1 ? 18 : 14;
+    ctx.fillStyle = d.color + 'cc';
+    ctx.beginPath();
+    ctx.arc(px, py, radius, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Border
+    ctx.strokeStyle = d.color;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // White center
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(px, py, radius - 5, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // Division initial or number
+    ctx.fillStyle = d.color;
+    ctx.font = 'bold 11px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(results.divisions.length > 1 ? (i + 1) : '', px, py);
+
+    // Label
+    const labelY = py - radius - 10;
+    const short = d.name.length > 16 ? d.name.substring(0, 14) + '..' : d.name;
+    ctx.font = 'bold 11px DM Sans, sans-serif';
+    const tw = ctx.measureText(short).width;
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(px - tw / 2 - 6, labelY - 8, tw + 12, 18, 4);
+    else ctx.rect(px - tw / 2 - 6, labelY - 8, tw + 12, 18);
+    ctx.fill();
+    ctx.strokeStyle = d.color + '50';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = d.color;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(short, px, labelY + 1);
+  });
+
+  // Zone badge
+  const d = results.primaryDiv;
+  const zi = getZone(d.cell);
+  const badge = document.getElementById('zoneBadge');
+  badge.textContent = 'Cell ' + d.cell + ' \u2014 ' + zi.name;
+  badge.style.background = zi.bg;
+  badge.style.color = zi.color;
+}
+
+/* ── Strategy Card ──────────────────────────────── */
+function buildStrategyCard() {
+  const sc = document.getElementById('strategyCard');
+  const r = results;
+  const d = r.primaryDiv;
+  const zi = getZone(d.cell);
+  let emoji, label, color, tagline, items;
+
+  if (zi.zone === 1) {
+    emoji = '🚀'; label = 'Grow and Build'; color = '#16a34a';
+    tagline = `${r.company} falls in the Grow and Build zone (Cell ${d.cell}) with an IFE of ${d.ife.toFixed(2)} and EFE of ${d.efe.toFixed(2)}, indicating strong internal and external positions that support aggressive growth.`;
+    items = [
+      { icon: '📈', title: 'Market Penetration', body: 'Increase market share in existing markets through enhanced marketing efforts, competitive pricing, or increased sales force effectiveness.' },
+      { icon: '🌍', title: 'Market Development', body: 'Enter new geographic markets or target new customer segments with existing products to expand revenue streams.' },
+      { icon: '💡', title: 'Product Development', body: 'Invest in developing new products or enhancing existing ones to better serve current markets and stay ahead of competitors.' },
+      { icon: '🔗', title: 'Forward Integration', body: 'Gain control of distribution channels or retail outlets to increase market power and capture more value from the supply chain.' },
+      { icon: '🏭', title: 'Backward Integration', body: 'Acquire or develop control over suppliers to reduce costs, ensure supply reliability, and improve quality control.' },
+      { icon: '🤝', title: 'Horizontal Integration', body: 'Acquire or merge with competitors to increase market share, achieve economies of scale, and reduce competitive pressure.' }
+    ];
+  } else if (zi.zone === 2) {
+    emoji = '⚖️'; label = 'Hold and Maintain'; color = '#2563eb';
+    tagline = `${r.company} falls in the Hold and Maintain zone (Cell ${d.cell}) with an IFE of ${d.ife.toFixed(2)} and EFE of ${d.efe.toFixed(2)}, suggesting a selective and careful approach to strategy.`;
+    items = [
+      { icon: '📈', title: 'Market Penetration', body: 'Focus on increasing share in your strongest market segments. Targeted efforts yield better returns than broad expansion in this zone.' },
+      { icon: '💡', title: 'Selective Product Development', body: 'Invest in product improvements for your most profitable lines rather than launching entirely new products.' },
+      { icon: '✂️', title: 'Cost Efficiency Improvements', body: 'Streamline operations to improve margins. Efficiency gains can strengthen your internal position over time.' },
+      { icon: '🛡️', title: 'Defend Current Market Share', body: 'Protect your existing customer base through loyalty programs, quality improvements, and responsive customer service.' },
+      { icon: '👁️', title: 'Monitor for Zone Shifts', body: 'Watch for changes in your internal or external environment that could shift you into Zone 1 (opportunity) or Zone 3 (risk).' },
+      { icon: '🔧', title: 'Incremental Innovation', body: 'Make steady, incremental improvements rather than radical changes. Small gains compound into significant competitive advantages.' }
+    ];
+  } else {
+    emoji = '⚠️'; label = 'Harvest or Divest'; color = '#dc2626';
+    tagline = `${r.company} falls in the Harvest or Divest zone (Cell ${d.cell}) with an IFE of ${d.ife.toFixed(2)} and EFE of ${d.efe.toFixed(2)}, indicating weak positions that require defensive strategic action.`;
+    items = [
+      { icon: '✂️', title: 'Retrenchment', body: 'Cut costs, reduce workforce, and eliminate unprofitable product lines. Focus resources on the few areas that still generate returns.' },
+      { icon: '💰', title: 'Divestiture', body: 'Sell off underperforming business units or divisions to generate cash and refocus on core competencies.' },
+      { icon: '🏷️', title: 'Liquidation of Non-Core Assets', body: 'Sell non-essential assets to raise capital. Use proceeds to fund turnaround efforts or reduce debt.' },
+      { icon: '📉', title: 'Cost Reduction Program', body: 'Implement aggressive cost-cutting measures across all operations to improve financial viability in the short term.' },
+      { icon: '💵', title: 'Harvest Cash Flow', body: 'Extract maximum cash from the business while minimizing new investment. Use cash to fund more promising ventures.' },
+      { icon: '🚪', title: 'Exit Planning', body: 'Develop a systematic plan for exiting unprofitable markets or shutting down operations in an orderly manner.' }
+    ];
+  }
+
+  sc.innerHTML = `
+    <div class="strategy-header">
+      <div class="icon-big">${emoji}</div>
+      <div><h3>Strategic Zone: ${label}</h3><p>${tagline}</p></div>
+    </div>
+    <div class="strategy-grid">
+      ${items.map(s => `<div class="strategy-item"><h4 style="color:${color}">${s.icon} ${s.title}</h4><p>${s.body}</p></div>`).join('')}
+    </div>
+  `;
+}
+
+/* ── Print Header ───────────────────────────────── */
+function updatePrintHeader() {
+  document.getElementById('print-title').textContent = 'IE Matrix Analysis \u2014 ' + results.company;
+  let meta = [];
+  if (results.industry) meta.push(results.industry);
+  if (results.analyst) meta.push('Analyst: ' + results.analyst);
+  if (results.date) meta.push(results.date);
+  document.getElementById('print-meta').textContent = meta.join('  |  ');
+}
+
+/* ── Reset ──────────────────────────────────────── */
+function resetAll() {
+  results = {};
+  ['companyName','companyIndustry','analystName','analysisDate']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('divRows').innerHTML = '';
+  addDivision();
+  setStep(1);
+}
+
+/* ── Initialize ─────────────────────────────────── */
+addDivision();
+</script>
+</body>
+</html>

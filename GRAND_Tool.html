@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grand Strategy Matrix Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens ──────────────────────────────── */
+:root {
+  --navy:   #0f2342;
+  --cobalt: #1a3a6e;
+  --sky:    #2563eb;
+  --steel:  #64748b;
+  --cloud:  #f1f5f9;
+  --white:  #ffffff;
+  --accent: #f59e0b;
+  --green:  #10b981;
+  --red:    #ef4444;
+  --orange: #f97316;
+  --text:   #1e293b;
+  --muted:  #94a3b8;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow:    0 4px 24px rgba(15,35,66,0.10);
+  --shadow-lg: 0 12px 48px rgba(15,35,66,0.16);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif; color: var(--text);
+  background: var(--navy);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(37,99,235,0.25) 0%, transparent 60%),
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px);
+  min-height: 100vh; line-height: 1.7;
+}
+.app-shell { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; }
+
+/* ── App Header ─────────────────────────────────── */
+.app-header { text-align: center; margin-bottom: 48px; }
+.app-header .eyebrow {
+  display: inline-block; background: rgba(37,99,235,0.25); color: #93c5fd;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(147,197,253,0.25); margin-bottom: 20px;
+}
+.app-header h1 { font-family: 'DM Serif Display', serif; font-size: clamp(2.2rem,5vw,3.4rem); color: var(--white); line-height: 1.1; margin-bottom: 14px; }
+.app-header h1 em { font-style: italic; color: #93c5fd; }
+.app-header p { color: #94a3b8; font-size: 1.05rem; max-width: 520px; margin: 0 auto; line-height: 1.7; font-weight: 300; }
+
+/* ── Progress Bar ───────────────────────────────── */
+.progress-bar-wrap { display: flex; align-items: center; margin-bottom: 40px; position: relative; }
+.progress-bar-wrap::before { content:''; position: absolute; top: 18px; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.08); z-index: 0; }
+.progress-bar-fill { position: absolute; top: 18px; left: 0; height: 2px; background: var(--sky); z-index: 1; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+.step-node { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative; z-index: 2; }
+.step-node .bubble { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: var(--muted); transition: all 0.3s ease; }
+.step-node.active .bubble { background: var(--sky); border-color: var(--sky); color: white; box-shadow: 0 0 0 4px rgba(37,99,235,0.25); }
+.step-node.done .bubble { background: var(--green); border-color: var(--green); color: white; }
+.step-node .step-label { font-size: 0.7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; transition: color 0.3s; }
+.step-node.active .step-label { color: #93c5fd; }
+.step-node.done .step-label { color: var(--green); }
+
+/* ── Card ───────────────────────────────────────── */
+.card { background: var(--white); border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; animation: slideUp 0.4s cubic-bezier(0.4,0,0.2,1); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.card-header { background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%); padding: 28px 36px; display: flex; align-items: center; gap: 16px; }
+.card-header h2 { font-family: 'DM Serif Display', serif; color: white; font-size: 1.5rem; }
+.card-header p { color: #94a3b8; font-size: 0.85rem; margin-top: 4px; font-weight: 300; }
+.card-header .icon { width: 48px; height: 48px; background: rgba(255,255,255,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+.card-body { padding: 36px; }
+.step { display: none; } .step.active { display: block; }
+
+/* ── Form ───────────────────────────────────────── */
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--steel); margin-bottom: 8px; }
+input[type="text"], input[type="number"], textarea { width: 100%; padding: 13px 16px; border: 2px solid var(--border); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 1rem; color: var(--text); background: var(--cloud); transition: border-color 0.2s, box-shadow 0.2s; outline: none; }
+input:focus, textarea:focus { border-color: var(--sky); box-shadow: 0 0 0 4px rgba(37,99,235,0.12); background: white; }
+input.error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(239,68,68,0.12); }
+.error-msg { font-size: 0.8rem; color: var(--red); margin-top: 5px; font-weight: 500; display: none; }
+
+/* ── Buttons ────────────────────────────────────── */
+.btn { padding: 13px 28px; border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 700; cursor: pointer; border: 2px solid transparent; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 8px; }
+.btn-primary { background: var(--sky); color: white; box-shadow: 0 4px 16px rgba(37,99,235,0.30); }
+.btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(37,99,235,0.35); }
+.btn-secondary { background: transparent; color: var(--steel); border-color: var(--border); }
+.btn-secondary:hover { background: var(--cloud); color: var(--text); }
+.btn-accent { background: var(--accent); color: white; box-shadow: 0 4px 16px rgba(245,158,11,0.30); }
+.btn-accent:hover { background: #d97706; transform: translateY(-1px); }
+.btn-row { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; margin-top: 28px; }
+.hint-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 20px; margin-bottom: 28px; font-size: 0.85rem; color: #1e40af; line-height: 1.7; }
+
+/* ── Slider Input ─────────────────────────────── */
+.slider-group { margin-bottom: 32px; }
+.slider-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.slider-label-row label { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--steel); margin-bottom: 0; }
+.slider-value-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 48px; height: 32px; border-radius: 8px; font-size: 1rem; font-weight: 700; padding: 0 10px; }
+.slider-desc { font-size: 0.82rem; color: var(--steel); margin-bottom: 10px; font-weight: 500; text-align: center; min-height: 1.4em; }
+.slider-wrap { position: relative; padding: 0 4px; }
+.slider-wrap input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 8px; border-radius: 4px; outline: none;
+  background: linear-gradient(to right, var(--red), var(--border) 50%, var(--green));
+  border: none; box-shadow: none; padding: 0;
+}
+.slider-wrap input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: white; border: 3px solid var(--sky);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s;
+}
+.slider-wrap input[type="range"]::-webkit-slider-thumb:hover {
+  border-color: #1d4ed8; box-shadow: 0 2px 12px rgba(37,99,235,0.3);
+}
+.slider-wrap input[type="range"]::-moz-range-thumb {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: white; border: 3px solid var(--sky);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  cursor: pointer;
+}
+.slider-ticks { display: flex; justify-content: space-between; margin-top: 6px; padding: 0 2px; }
+.slider-ticks span { font-size: 0.68rem; font-weight: 600; color: var(--muted); width: 24px; text-align: center; }
+
+/* ── Results ────────────────────────────────────── */
+.score-summary { background: white; border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px; }
+.score-table { width: 100%; border-collapse: collapse; }
+.score-table th { background: var(--cloud); padding: 12px 20px; text-align: left; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--steel); border-bottom: 2px solid var(--border); }
+.score-table td { padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.score-table tr:last-child td { border-bottom: none; }
+.score-chip { display: inline-flex; align-items: center; justify-content: center; padding: 3px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 700; }
+.coord-row { background: var(--navy); }
+.coord-row td { border-bottom: none !important; padding: 16px 20px; color: white; }
+.coord-row .coord-pair { font-family: 'DM Serif Display', serif; font-size: 1.3rem; color: #93c5fd; }
+
+/* ── Chart ──────────────────────────────────────── */
+.chart-wrap { background: white; border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; margin-bottom: 28px; }
+.chart-topbar { background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%); padding: 20px 28px; display: flex; align-items: center; gap: 12px; }
+.chart-topbar h3 { font-family: 'DM Serif Display', serif; color: white; font-size: 1.15rem; }
+.chart-topbar .chart-icon { width: 40px; height: 40px; background: rgba(255,255,255,0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+.chart-topbar .quadrant-badge { padding: 6px 16px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-left: auto; }
+.chart-body { padding: 24px; text-align: center; }
+canvas#matrixCanvas { display: block; width: 100%; max-width: 700px; margin: 0 auto; }
+
+/* ── Strategy Card ─────────────────────────────── */
+.strategy-card { background: white; border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px; }
+.strategy-header { padding: 24px 28px 20px; border-bottom: 2px solid var(--border); display: flex; align-items: flex-start; gap: 16px; }
+.strategy-header .icon-big { font-size: 2rem; line-height: 1; }
+.strategy-header h3 { font-family: 'DM Serif Display', serif; font-size: 1.3rem; color: var(--text); margin-bottom: 4px; }
+.strategy-header p { color: var(--steel); font-size: 0.88rem; line-height: 1.6; }
+.strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.strategy-item { padding: 20px 24px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); transition: background 0.15s; }
+.strategy-item:hover { background: var(--cloud); }
+.strategy-item:nth-child(even) { border-right: none; }
+.strategy-item:nth-last-child(-n+2) { border-bottom: none; }
+.strategy-item h4 { font-size: 0.88rem; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.strategy-item p { font-size: 0.82rem; color: var(--steel); line-height: 1.6; }
+
+/* ── Print ──────────────────────────────────────── */
+.print-only { display: none; }
+@media print {
+  body { background: white !important; color: black; }
+  @page { margin: 1.5cm; }
+  .app-header, .progress-bar-wrap, .no-print, #step1, #step2 { display: none !important; }
+  .print-only { display: block !important; }
+  #step3 { display: block !important; }
+  .card, .chart-wrap, .score-summary, .strategy-card { box-shadow: none !important; border: 1px solid #ddd; }
+  .card-header, .chart-topbar { background: #1a3a6e !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .app-shell { padding: 0; max-width: 100%; }
+  canvas#matrixCanvas { max-width: 500px; margin: 0 auto; display: block; }
+  .strategy-item { break-inside: avoid; }
+  .score-summary { break-inside: avoid; }
+  .chart-wrap { break-inside: avoid; }
+  .strategy-grid { grid-template-columns: 1fr 1fr; }
+  .print-header { text-align: center; padding: 20px 0 30px; border-bottom: 3px solid #1a3a6e; margin-bottom: 24px; }
+  .print-header h1 { font-size: 1.8rem; color: #1a3a6e; font-family: 'DM Serif Display', serif; }
+  .print-header p { color: #666; font-size: 0.9rem; margin-top: 6px; }
+}
+@media (max-width: 620px) { .strategy-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <div class="app-header no-print">
+    <div class="eyebrow">Strategic Management Tool</div>
+    <h1>Grand Strategy <em>Matrix</em></h1>
+    <p>Position your company based on competitive strength and market growth to identify the most appropriate strategic direction.</p>
+  </div>
+
+  <div class="progress-bar-wrap no-print" id="progressBar">
+    <div class="progress-bar-fill" id="progressFill" style="width:16%"></div>
+    <div class="step-node active" id="node1"><div class="bubble">1</div><span class="step-label">Company</span></div>
+    <div class="step-node" id="node2"><div class="bubble">2</div><span class="step-label">Scores</span></div>
+    <div class="step-node" id="node3"><div class="bubble">3</div><span class="step-label">Results</span></div>
+  </div>
+
+  <!-- ═══════════ STEP 1 ═══════════ -->
+  <div class="step active" id="step1">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">🏢</div>
+        <div><h2>Company Information</h2><p>Identify the organization being analyzed</p></div>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="companyName">Company Name *</label>
+          <input type="text" id="companyName" placeholder="e.g. Apple Inc." aria-label="Company Name">
+          <div class="error-msg" id="err-company">Please enter a company name to continue.</div>
+        </div>
+        <div class="form-group">
+          <label for="companyIndustry">Industry / Sector</label>
+          <input type="text" id="companyIndustry" placeholder="e.g. Consumer Electronics" aria-label="Industry or Sector">
+        </div>
+        <div class="form-group">
+          <label for="analystName">Analyst Name</label>
+          <input type="text" id="analystName" placeholder="e.g. Jane Smith" aria-label="Analyst Name">
+        </div>
+        <div class="form-group">
+          <label for="analysisDate">Date</label>
+          <input type="text" id="analysisDate" placeholder="" aria-label="Analysis Date">
+        </div>
+
+        <div class="hint-box">
+          <strong>How the Grand Strategy Matrix works:</strong><br>
+          The Grand Strategy Matrix positions a company in one of four quadrants based on two assessments:
+          <strong>Competitive Position</strong> (strong vs. weak) and <strong>Market Growth Rate</strong> (rapid vs. slow).
+          Each factor is scored from <strong>-3</strong> to <strong>+3</strong>. The resulting quadrant indicates which
+          broad strategic direction is most appropriate:<br>
+          &bull; <strong>Quadrant I</strong> (top-right) &mdash; Rapid Growth + Strong Position<br>
+          &bull; <strong>Quadrant II</strong> (top-left) &mdash; Rapid Growth + Weak Position<br>
+          &bull; <strong>Quadrant III</strong> (bottom-left) &mdash; Slow Growth + Weak Position<br>
+          &bull; <strong>Quadrant IV</strong> (bottom-right) &mdash; Slow Growth + Strong Position
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnToStep2">Continue to Scores &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 2 ═══════════ -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">📊</div>
+        <div><h2>Position Assessment</h2><p>Rate competitive position and market growth</p></div>
+      </div>
+      <div class="card-body">
+        <div class="hint-box">
+          <strong>📘 How to use this tool:</strong><br>
+          &bull; Use the sliders to assess your company's <strong>Competitive Position</strong> (weak to strong) and <strong>Market Growth Rate</strong> (declining to rapid growth).<br>
+          &bull; Each score ranges from <strong>-3</strong> (very weak / rapid decline) to <strong>+3</strong> (very strong / rapid growth).<br>
+          &bull; Base your assessment on your prior analyses (IFE, EFE, CPM) and industry research.<br>
+          &bull; The tool will plot the intersection point on the Grand Strategy Matrix and recommend appropriate strategies.
+        </div>
+
+        <!-- Competitive Position Slider -->
+        <div class="slider-group">
+          <div class="slider-label-row">
+            <label>Competitive Position Score</label>
+            <span class="slider-value-badge" id="cpBadge" style="background:#2563eb20;color:#2563eb;">0</span>
+          </div>
+          <div class="slider-desc" id="cpDesc">Neutral</div>
+          <div class="slider-wrap">
+            <input type="range" id="cpSlider" min="-3" max="3" step="0.5" value="0" aria-label="Competitive Position Score from -3 to +3">
+          </div>
+          <div class="slider-ticks">
+            <span>-3</span><span>-2</span><span>-1</span><span>0</span><span>+1</span><span>+2</span><span>+3</span>
+          </div>
+        </div>
+
+        <!-- Market Growth Rate Slider -->
+        <div class="slider-group">
+          <div class="slider-label-row">
+            <label>Market Growth Rate</label>
+            <span class="slider-value-badge" id="mgBadge" style="background:#16a34a20;color:#16a34a;">0</span>
+          </div>
+          <div class="slider-desc" id="mgDesc">Stable</div>
+          <div class="slider-wrap">
+            <input type="range" id="mgSlider" min="-3" max="3" step="0.5" value="0" aria-label="Market Growth Rate from -3 to +3">
+          </div>
+          <div class="slider-ticks">
+            <span>-3</span><span>-2</span><span>-1</span><span>0</span><span>+1</span><span>+2</span><span>+3</span>
+          </div>
+        </div>
+
+        <div id="form-error" style="display:none; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:20px; color:#dc2626; font-size:0.85rem; font-weight:500;"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="goToStep1()">&larr; Back</button>
+          <button class="btn btn-primary" onclick="generateResults()">Generate Results &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 3 ═══════════ -->
+  <div class="step" id="step3">
+    <div class="print-only print-header">
+      <h1 id="print-title">Grand Strategy Matrix Analysis</h1>
+      <p id="print-meta"></p>
+    </div>
+
+    <!-- Score Summary -->
+    <div class="score-summary">
+      <table class="score-table">
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th>Assessment</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody id="scoreTableBody"></tbody>
+        <tbody>
+          <tr class="coord-row">
+            <td colspan="2">
+              <strong>Strategic Position Coordinates</strong>
+              <span style="font-size:0.78rem;color:#94a3b8;margin-left:12px;">(X = Competitive Position | Y = Market Growth)</span>
+            </td>
+            <td><span class="coord-pair" id="coordDisplay">&mdash;</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-wrap">
+      <div class="chart-topbar">
+        <div class="chart-icon">📊</div>
+        <h3>Grand Strategy Matrix</h3>
+        <span class="quadrant-badge" id="quadrantBadge"></span>
+      </div>
+      <div class="chart-body">
+        <canvas id="matrixCanvas" width="700" height="700"></canvas>
+      </div>
+    </div>
+
+    <!-- Strategy Card -->
+    <div class="strategy-card" id="strategyCard"></div>
+
+    <div class="btn-row no-print">
+      <button class="btn btn-secondary" onclick="goToStep2()">&larr; Edit Scores</button>
+      <button class="btn btn-secondary" onclick="resetAll()">&#8634; Start Over</button>
+      <button class="btn btn-accent" onclick="window.print()">&#128424; Print / Save PDF</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   Grand Strategy Matrix Tool — JavaScript
+   ═══════════════════════════════════════════════════════ */
+
+let results = {};
+
+/* ── Quadrant Configuration ────────────────────── */
+const quadrantConfig = {
+  I:   { color: '#16a34a', bg: 'rgba(22,163,74,0.12)',   emoji: '\uD83D\uDE80', label: 'Quadrant I', subtitle: 'Rapid Growth + Strong Position' },
+  II:  { color: '#2563eb', bg: 'rgba(37,99,235,0.12)',   emoji: '\u26A1',       label: 'Quadrant II', subtitle: 'Rapid Growth + Weak Position' },
+  III: { color: '#dc2626', bg: 'rgba(220,38,38,0.10)',   emoji: '\uD83D\uDEE1\uFE0F', label: 'Quadrant III', subtitle: 'Slow Growth + Weak Position' },
+  IV:  { color: '#d97706', bg: 'rgba(245,158,11,0.10)',  emoji: '\uD83C\uDF31', label: 'Quadrant IV', subtitle: 'Slow Growth + Strong Position' },
+  boundary: { color: '#64748b', bg: 'rgba(100,116,139,0.12)', emoji: '\u2696\uFE0F', label: 'On the Boundary', subtitle: 'Between Quadrants' }
+};
+
+/* ── Slider Descriptors ────────────────────────── */
+const cpDescriptors = {
+  '-3': 'Very Weak', '-2.5': 'Very Weak', '-2': 'Weak', '-1.5': 'Weak',
+  '-1': 'Slightly Weak', '-0.5': 'Slightly Weak',
+  '0': 'Neutral',
+  '0.5': 'Slightly Strong', '1': 'Slightly Strong',
+  '1.5': 'Strong', '2': 'Strong',
+  '2.5': 'Very Strong', '3': 'Very Strong'
+};
+const mgDescriptors = {
+  '-3': 'Rapid Decline', '-2.5': 'Rapid Decline', '-2': 'Below Average Growth', '-1.5': 'Below Average Growth',
+  '-1': 'Slight Decline', '-0.5': 'Slight Decline',
+  '0': 'Stable',
+  '0.5': 'Slight Growth', '1': 'Slight Growth',
+  '1.5': 'Above Average Growth', '2': 'Above Average Growth',
+  '2.5': 'Rapid Growth', '3': 'Rapid Growth'
+};
+
+/* ── Date ───────────────────────────────────────── */
+(function() {
+  var now = new Date();
+  var m = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('analysisDate').value = m[now.getMonth()] + ' ' + now.getFullYear();
+})();
+
+/* ── Slider Updates ────────────────────────────── */
+function updateSliderDisplay() {
+  var cpVal = parseFloat(document.getElementById('cpSlider').value);
+  var mgVal = parseFloat(document.getElementById('mgSlider').value);
+
+  var cpBadge = document.getElementById('cpBadge');
+  var mgBadge = document.getElementById('mgBadge');
+
+  cpBadge.textContent = (cpVal > 0 ? '+' : '') + cpVal;
+  mgBadge.textContent = (mgVal > 0 ? '+' : '') + mgVal;
+
+  // Color the badges based on positive/negative
+  if (cpVal > 0) { cpBadge.style.background = '#16a34a20'; cpBadge.style.color = '#16a34a'; }
+  else if (cpVal < 0) { cpBadge.style.background = '#dc262620'; cpBadge.style.color = '#dc2626'; }
+  else { cpBadge.style.background = '#64748b20'; cpBadge.style.color = '#64748b'; }
+
+  if (mgVal > 0) { mgBadge.style.background = '#16a34a20'; mgBadge.style.color = '#16a34a'; }
+  else if (mgVal < 0) { mgBadge.style.background = '#dc262620'; mgBadge.style.color = '#dc2626'; }
+  else { mgBadge.style.background = '#64748b20'; mgBadge.style.color = '#64748b'; }
+
+  document.getElementById('cpDesc').textContent = cpDescriptors[String(cpVal)] || 'Neutral';
+  document.getElementById('mgDesc').textContent = mgDescriptors[String(mgVal)] || 'Stable';
+}
+
+document.getElementById('cpSlider').addEventListener('input', updateSliderDisplay);
+document.getElementById('mgSlider').addEventListener('input', updateSliderDisplay);
+
+/* ── Navigation ─────────────────────────────────── */
+function setStep(n) {
+  document.querySelectorAll('.step').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById('step' + n).classList.add('active');
+  for (var i = 1; i <= 3; i++) {
+    var node = document.getElementById('node' + i);
+    node.classList.remove('active','done');
+    if (i < n) node.classList.add('done');
+    else if (i === n) node.classList.add('active');
+  }
+  document.getElementById('progressFill').style.width = (n === 1 ? 16 : n === 2 ? 50 : 92) + '%';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function goToStep1() { setStep(1); }
+function goToStep2() { setStep(2); }
+
+/* ── Step 1 Validation ──────────────────────────── */
+document.getElementById('btnToStep2').onclick = function() {
+  var name = document.getElementById('companyName').value.trim();
+  var err = document.getElementById('err-company');
+  if (!name) {
+    document.getElementById('companyName').classList.add('error');
+    err.style.display = 'block';
+    return;
+  }
+  document.getElementById('companyName').classList.remove('error');
+  err.style.display = 'none';
+  setStep(2);
+};
+
+/* ── Quadrant Determination ────────────────────── */
+function getQuadrant(x, y) {
+  if (x === 0 || y === 0) return 'boundary';
+  if (x > 0 && y > 0) return 'I';
+  if (x < 0 && y > 0) return 'II';
+  if (x < 0 && y < 0) return 'III';
+  if (x > 0 && y < 0) return 'IV';
+  return 'boundary';
+}
+
+/* ── Generate Results ───────────────────────────── */
+function generateResults() {
+  var errBox = document.getElementById('form-error');
+  errBox.style.display = 'none';
+  var errors = [];
+
+  var cpScore = parseFloat(document.getElementById('cpSlider').value);
+  var mgScore = parseFloat(document.getElementById('mgSlider').value);
+
+  if (isNaN(cpScore) || cpScore < -3 || cpScore > 3) errors.push('Competitive Position must be between -3 and +3.');
+  if (isNaN(mgScore) || mgScore < -3 || mgScore > 3) errors.push('Market Growth Rate must be between -3 and +3.');
+
+  if (errors.length) {
+    errBox.innerHTML = errors.join('<br>');
+    errBox.style.display = 'block';
+    return;
+  }
+
+  var quadrant = getQuadrant(cpScore, mgScore);
+
+  results = {
+    company: document.getElementById('companyName').value.trim(),
+    industry: document.getElementById('companyIndustry').value.trim(),
+    analyst: document.getElementById('analystName').value.trim(),
+    date: document.getElementById('analysisDate').value.trim(),
+    xCoord: cpScore,
+    yCoord: mgScore,
+    quadrant: quadrant,
+    cpDesc: cpDescriptors[String(cpScore)] || 'Neutral',
+    mgDesc: mgDescriptors[String(mgScore)] || 'Stable'
+  };
+
+  buildScoreTable();
+  drawMatrix();
+  buildStrategyCard();
+  updatePrintHeader();
+  setStep(3);
+}
+
+/* ── Score Table ────────────────────────────────── */
+function buildScoreTable() {
+  var r = results;
+  var tbody = document.getElementById('scoreTableBody');
+  var qc = quadrantConfig[r.quadrant];
+
+  var cpColor = r.xCoord > 0 ? '#16a34a' : r.xCoord < 0 ? '#dc2626' : '#64748b';
+  var mgColor = r.yCoord > 0 ? '#16a34a' : r.yCoord < 0 ? '#dc2626' : '#64748b';
+
+  tbody.innerHTML =
+    '<tr>' +
+      '<td><span style="font-weight:700;color:#7c3aed;">Competitive Position</span></td>' +
+      '<td style="font-size:0.85rem;color:var(--steel);">' + r.cpDesc + '</td>' +
+      '<td><span class="score-chip" style="background:' + cpColor + '20;color:' + cpColor + ';">' + (r.xCoord > 0 ? '+' : '') + r.xCoord + '</span></td>' +
+    '</tr>' +
+    '<tr>' +
+      '<td><span style="font-weight:700;color:#16a34a;">Market Growth Rate</span></td>' +
+      '<td style="font-size:0.85rem;color:var(--steel);">' + r.mgDesc + '</td>' +
+      '<td><span class="score-chip" style="background:' + mgColor + '20;color:' + mgColor + ';">' + (r.yCoord > 0 ? '+' : '') + r.yCoord + '</span></td>' +
+    '</tr>' +
+    '<tr>' +
+      '<td><span style="font-weight:700;color:' + qc.color + ';">Quadrant</span></td>' +
+      '<td style="font-size:0.85rem;color:var(--steel);">' + qc.subtitle + '</td>' +
+      '<td><span class="score-chip" style="background:' + qc.bg + ';color:' + qc.color + ';">' + qc.label + '</span></td>' +
+    '</tr>';
+
+  document.getElementById('coordDisplay').textContent = '(' + (r.xCoord > 0 ? '+' : '') + r.xCoord + ', ' + (r.yCoord > 0 ? '+' : '') + r.yCoord + ')';
+}
+
+/* ── Canvas Chart — 4-Quadrant Grand Strategy Matrix ── */
+function drawMatrix() {
+  var canvas = document.getElementById('matrixCanvas');
+  var ctx = canvas.getContext('2d');
+  var W = 700, H = 700;
+  var cx = W / 2, cy = H / 2;
+  var scale = 87.5; // px per unit (700/8 = 87.5, leaves margin)
+  var maxR = 3;     // max range on each axis
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#fafbfc';
+  ctx.fillRect(0, 0, W, H);
+
+  // 1. QUADRANT FILLS
+  var quadrants = [
+    { x: cx, y: 0,  w: cx, h: cy, color: 'rgba(22,163,74,0.12)',  label: 'QUADRANT I',   lx: cx + cx/2, ly: 36 },
+    { x: 0,  y: 0,  w: cx, h: cy, color: 'rgba(37,99,235,0.12)',  label: 'QUADRANT II',  lx: cx/2,      ly: 36 },
+    { x: 0,  y: cy, w: cx, h: cy, color: 'rgba(220,38,38,0.10)',  label: 'QUADRANT III', lx: cx/2,      ly: H - 16 },
+    { x: cx, y: cy, w: cx, h: cy, color: 'rgba(245,158,11,0.10)', label: 'QUADRANT IV',  lx: cx + cx/2, ly: H - 16 }
+  ];
+  var qColors = ['#16a34a', '#2563eb', '#dc2626', '#d97706'];
+  var qSubtitles = [
+    'Rapid Growth + Strong Position',
+    'Rapid Growth + Weak Position',
+    'Slow Growth + Weak Position',
+    'Slow Growth + Strong Position'
+  ];
+
+  quadrants.forEach(function(q, i) {
+    ctx.fillStyle = q.color;
+    ctx.fillRect(q.x, q.y, q.w, q.h);
+    ctx.font = 'bold 14px DM Sans, sans-serif';
+    ctx.fillStyle = qColors[i];
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = 0.65;
+    ctx.fillText(q.label, q.lx, q.ly);
+    ctx.font = '500 10px DM Sans, sans-serif';
+    ctx.fillText(qSubtitles[i], q.lx, q.ly + 16);
+    ctx.globalAlpha = 1;
+  });
+
+  // 2. GRID LINES
+  ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+  ctx.lineWidth = 1;
+  for (var gi = -maxR; gi <= maxR; gi++) {
+    ctx.beginPath();
+    ctx.moveTo(cx + gi * scale, cy - maxR * scale);
+    ctx.lineTo(cx + gi * scale, cy + maxR * scale);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - maxR * scale, cy + gi * scale);
+    ctx.lineTo(cx + maxR * scale, cy + gi * scale);
+    ctx.stroke();
+  }
+
+  // 3. AXES
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - maxR * scale - 10, cy);
+  ctx.lineTo(cx + maxR * scale + 10, cy);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + maxR * scale + 10);
+  ctx.lineTo(cx, cy - maxR * scale - 10);
+  ctx.stroke();
+
+  // 4. ARROWHEADS
+  function arrowhead(x, y, angle) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(-12, -6); ctx.lineTo(-12, 6);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  arrowhead(cx + maxR * scale + 10, cy, 0);
+  arrowhead(cx - maxR * scale - 10, cy, Math.PI);
+  arrowhead(cx, cy - maxR * scale - 10, -Math.PI / 2);
+  arrowhead(cx, cy + maxR * scale + 10, Math.PI / 2);
+
+  // 5. TICK MARKS AND NUMBERS
+  ctx.fillStyle = '#64748b';
+  ctx.font = '11px DM Sans, sans-serif';
+  ctx.textAlign = 'center';
+  for (var ti = -maxR; ti <= maxR; ti++) {
+    if (ti === 0) continue;
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx + ti * scale, cy - 5);
+    ctx.lineTo(cx + ti * scale, cy + 5);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, cy - ti * scale);
+    ctx.lineTo(cx + 5, cy - ti * scale);
+    ctx.stroke();
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'center';
+    ctx.fillText(ti, cx + ti * scale, cy + 20);
+    ctx.textAlign = 'right';
+    ctx.fillText(ti, cx - 10, cy - ti * scale + 4);
+    ctx.textAlign = 'center';
+  }
+
+  // 6. AXIS LABELS
+  ctx.fillStyle = '#1e293b';
+  ctx.font = 'bold 12px DM Sans, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('\u2190 Weak Competitive Position  |  Strong Competitive Position \u2192', cx, H - 6);
+  ctx.save();
+  ctx.translate(14, cy);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('\u2190 Slow Market Growth  |  Rapid Market Growth \u2192', 0, 0);
+  ctx.restore();
+
+  // 7. STRATEGIC VECTOR
+  var r = results;
+  var vx = cx + r.xCoord * scale;
+  var vy = cy - r.yCoord * scale;
+  var qc = quadrantConfig[r.quadrant];
+
+  // Vector line shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.15)';
+  ctx.shadowBlur = 8;
+  ctx.strokeStyle = qc.color + 'aa';
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(vx, vy); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Vector line
+  ctx.strokeStyle = qc.color;
+  ctx.lineWidth = 3.5;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(vx, vy); ctx.stroke();
+
+  // Arrowhead on vector
+  if (r.xCoord !== 0 || r.yCoord !== 0) {
+    var angle = Math.atan2(-(vy - cy), vx - cx);
+    ctx.save(); ctx.translate(vx, vy); ctx.rotate(angle);
+    ctx.fillStyle = qc.color;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-18, -9); ctx.lineTo(-18, 9);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+
+  // Origin dot
+  ctx.fillStyle = '#94a3b8';
+  ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 2 * Math.PI); ctx.fill();
+
+  // End point (bullseye)
+  ctx.fillStyle = qc.color;
+  ctx.beginPath(); ctx.arc(vx, vy, 9, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(vx, vy, 5, 0, 2 * Math.PI); ctx.fill();
+
+  // Coordinate label with background pill
+  var lbl = '(' + (r.xCoord > 0 ? '+' : '') + r.xCoord + ', ' + (r.yCoord > 0 ? '+' : '') + r.yCoord + ')';
+  var labelOffX = r.xCoord >= 0 ? 14 : -14;
+  var labelOffY = r.yCoord >= 0 ? -18 : 22;
+  ctx.font = 'bold 13px DM Sans, sans-serif';
+  var tw = ctx.measureText(lbl).width;
+  var lbx = vx + labelOffX - (r.xCoord >= 0 ? 0 : tw);
+  var lby = vy + labelOffY - 13;
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(lbx - 6, lby, tw + 12, 20, 4);
+  else ctx.rect(lbx - 6, lby, tw + 12, 20);
+  ctx.fill();
+  ctx.strokeStyle = qc.color + '60';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = qc.color;
+  ctx.textAlign = 'left';
+  ctx.fillText(lbl, lbx, lby + 14);
+
+  // Update badge
+  var badge = document.getElementById('quadrantBadge');
+  badge.textContent = qc.label;
+  badge.style.background = qc.bg;
+  badge.style.color = qc.color;
+}
+
+/* ── Strategy Card ──────────────────────────────── */
+function buildStrategyCard() {
+  var sc = document.getElementById('strategyCard');
+  var r = results;
+  var qc = quadrantConfig[r.quadrant];
+  var emoji, label, color, tagline, items;
+
+  if (r.quadrant === 'I') {
+    emoji = '\uD83D\uDE80'; label = 'Quadrant I \u2014 Rapid Growth + Strong Position'; color = '#16a34a';
+    tagline = r.company + ' occupies Quadrant I \u2014 a strong competitive position in a rapidly growing market \u2014 the most favorable strategic position in the Grand Strategy Matrix.';
+    items = [
+      { icon: '\uD83D\uDCC8', title: 'Market Penetration', body: 'Concentrate on current markets and products to increase market share. Leverage your strong position to outpace competitors through aggressive marketing and competitive pricing.' },
+      { icon: '\uD83C\uDF0D', title: 'Market Development', body: 'Expand into new geographic regions or customer segments. Your competitive strength provides a solid foundation for entering unfamiliar markets.' },
+      { icon: '\uD83D\uDCA1', title: 'Product Development', body: 'Invest in new product lines or enhancements to existing offerings. Rapid market growth creates demand for innovation and differentiation.' },
+      { icon: '\uD83D\uDD17', title: 'Forward / Backward Integration', body: 'Gain control of your supply chain or distribution channels. Vertical integration strengthens your competitive advantage and captures more value.' },
+      { icon: '\uD83E\uDD1D', title: 'Horizontal Integration', body: 'Acquire or merge with competitors to consolidate market share. Growth markets often reward companies that can scale quickly.' },
+      { icon: '\uD83C\uDFAF', title: 'Related Diversification', body: 'Leverage your core competencies to enter related markets. Your strong position and growth trajectory provide resources to diversify strategically.' }
+    ];
+  } else if (r.quadrant === 'II') {
+    emoji = '\u26A1'; label = 'Quadrant II \u2014 Rapid Growth + Weak Position'; color = '#2563eb';
+    tagline = r.company + ' occupies Quadrant II \u2014 the market is growing rapidly but ' + r.company + ' has a weak competitive position requiring urgent improvement.';
+    items = [
+      { icon: '\uD83C\uDF0D', title: 'Market Development', body: 'Seek new markets or segments where your competitive weaknesses are less exposed. Find niches where you can compete more effectively.' },
+      { icon: '\uD83D\uDCC8', title: 'Market Penetration', body: 'Focus resources on your strongest segments to build share before competitors consolidate. Rapid growth means market positions are still being established.' },
+      { icon: '\uD83D\uDCA1', title: 'Product Development', body: 'Invest in improving your products or developing new ones that address competitive gaps. Innovation can leapfrog stronger rivals in growing markets.' },
+      { icon: '\uD83E\uDD1D', title: 'Horizontal Integration', body: 'Acquire a stronger competitor or merge to gain the capabilities and market position you currently lack.' },
+      { icon: '\u2702\uFE0F', title: 'Divestiture of Weakest Areas', body: 'Shed underperforming divisions or product lines to free resources for areas where you can realistically compete and grow.' },
+      { icon: '\uD83D\uDEAA', title: 'Liquidation if Infeasible', body: 'If improvements are not feasible and the company cannot close the competitive gap, consider an orderly exit to preserve remaining value.' }
+    ];
+  } else if (r.quadrant === 'III') {
+    emoji = '\uD83D\uDEE1\uFE0F'; label = 'Quadrant III \u2014 Slow Growth + Weak Position'; color = '#dc2626';
+    tagline = r.company + ' occupies Quadrant III \u2014 the combination of weak competitive position and slow market growth demands significant strategic change.';
+    items = [
+      { icon: '\u2702\uFE0F', title: 'Retrenchment', body: 'Cut costs, streamline operations, and refocus on core activities. In a weak position with slow growth, efficiency becomes critical for survival.' },
+      { icon: '\uD83C\uDFAF', title: 'Related Diversification', body: 'Leverage any remaining strengths to enter adjacent markets with better growth prospects. Use what you do well to find a more favorable playing field.' },
+      { icon: '\uD83C\uDFB2', title: 'Unrelated Diversification', body: 'If related markets are equally unattractive, consider entering entirely different industries where growth prospects are stronger.' },
+      { icon: '\uD83D\uDCB0', title: 'Divestiture', body: 'Sell off business units or divisions that are draining resources. Redirect the capital to areas with better strategic potential.' },
+      { icon: '\uD83D\uDEAA', title: 'Liquidation', body: 'If turnaround efforts are not viable, consider liquidating assets in an orderly manner to maximize recovery value for stakeholders.' },
+      { icon: '\uD83D\uDD27', title: 'Turnaround Plan', body: 'Develop a comprehensive turnaround plan with cost reduction targets, operational improvements, and a realistic timeline for returning to competitiveness.' }
+    ];
+  } else if (r.quadrant === 'IV') {
+    emoji = '\uD83C\uDF31'; label = 'Quadrant IV \u2014 Slow Growth + Strong Position'; color = '#d97706';
+    tagline = r.company + ' occupies Quadrant IV \u2014 a strong competitive position in a slow-growth market, providing stability and cash generation to diversify.';
+    items = [
+      { icon: '\uD83C\uDFAF', title: 'Related Diversification', body: 'Use your competitive strengths and cash flow to enter markets related to your core business. Familiarity reduces risk while opening growth avenues.' },
+      { icon: '\uD83C\uDFB2', title: 'Unrelated Diversification', body: 'Explore opportunities in high-growth industries outside your current sector. Your strong position provides resources to invest in new ventures.' },
+      { icon: '\uD83E\uDD1D', title: 'Joint Ventures', body: 'Partner with companies in faster-growing markets to share risk and gain market knowledge. Joint ventures provide growth without full commitment.' },
+      { icon: '\uD83D\uDD17', title: 'Forward / Backward Integration', body: 'Strengthen control over your value chain to improve margins and competitiveness, even in a slow-growth environment.' },
+      { icon: '\uD83C\uDFAF', title: 'Concentric Diversification', body: 'Add new products or services that are technologically or commercially related to your existing lines, leveraging established brand equity and expertise.' },
+      { icon: '\uD83C\uDF10', title: 'International Expansion', body: 'Seek faster-growing international markets where your competitive strengths can be replicated. Global expansion can offset domestic market stagnation.' }
+    ];
+  } else {
+    // Boundary
+    emoji = '\u2696\uFE0F'; label = 'On the Boundary'; color = '#64748b';
+    tagline = r.company + ' sits on the boundary between quadrants (one or both scores equal zero). This position is ambiguous \u2014 re-evaluate your competitive position and market growth assessment to determine the most appropriate quadrant.';
+    items = [
+      { icon: '\uD83D\uDD0D', title: 'Re-evaluate Competitive Position', body: 'A zero score suggests uncertainty. Conduct deeper analysis of your competitive advantages and weaknesses to determine a clearer direction.' },
+      { icon: '\uD83D\uDCCA', title: 'Reassess Market Growth', body: 'Investigate whether market growth trends are truly neutral or if emerging factors could shift growth in either direction.' },
+      { icon: '\u2696\uFE0F', title: 'Consider Adjacent Quadrants', body: 'Review the strategies recommended for the quadrants on either side of your boundary position and prepare contingency plans for both scenarios.' },
+      { icon: '\uD83D\uDCCB', title: 'Gather More Data', body: 'The boundary position may indicate insufficient data. Collect additional market research and competitive intelligence before committing to a strategic direction.' },
+      { icon: '\u23F3', title: 'Monitor and Wait', body: 'If the situation is genuinely ambiguous, maintain your current position while monitoring for shifts that clarify which quadrant you are moving toward.' },
+      { icon: '\uD83D\uDE80', title: 'Pursue Flexibility', body: 'Invest in strategic options that keep multiple paths open. Avoid committing heavily to one direction until the trajectory becomes clearer.' }
+    ];
+  }
+
+  sc.innerHTML =
+    '<div class="strategy-header">' +
+      '<div class="icon-big">' + emoji + '</div>' +
+      '<div>' +
+        '<h3>Strategic Position: ' + label + '</h3>' +
+        '<p>' + tagline + '</p>' +
+      '</div>' +
+    '</div>' +
+    '<div class="strategy-grid">' +
+      items.map(function(s) {
+        return '<div class="strategy-item"><h4 style="color:' + color + '">' + s.icon + ' ' + s.title + '</h4><p>' + s.body + '</p></div>';
+      }).join('') +
+    '</div>';
+}
+
+/* ── Print Header ───────────────────────────────── */
+function updatePrintHeader() {
+  document.getElementById('print-title').textContent = 'Grand Strategy Matrix \u2014 ' + results.company;
+  var meta = [];
+  if (results.industry) meta.push(results.industry);
+  if (results.analyst) meta.push('Analyst: ' + results.analyst);
+  if (results.date) meta.push(results.date);
+  document.getElementById('print-meta').textContent = meta.join('  |  ');
+}
+
+/* ── Reset ──────────────────────────────────────── */
+function resetAll() {
+  results = {};
+  ['companyName','companyIndustry','analystName','analysisDate']
+    .forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('cpSlider').value = 0;
+  document.getElementById('mgSlider').value = 0;
+  updateSliderDisplay();
+  setStep(1);
+}
+
+/* ── Initialize ─────────────────────────────────── */
+updateSliderDisplay();
+</script>
+</body>
+</html>

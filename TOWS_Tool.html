@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TOWS Matrix Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens ──────────────────────────────── */
+:root {
+  --navy:   #0f2342;
+  --cobalt: #1a3a6e;
+  --sky:    #2563eb;
+  --steel:  #64748b;
+  --cloud:  #f1f5f9;
+  --white:  #ffffff;
+  --accent: #f59e0b;
+  --green:  #10b981;
+  --red:    #ef4444;
+  --orange: #f97316;
+  --text:   #1e293b;
+  --muted:  #94a3b8;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow:    0 4px 24px rgba(15,35,66,0.10);
+  --shadow-lg: 0 12px 48px rgba(15,35,66,0.16);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif; color: var(--text);
+  background: var(--navy);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(37,99,235,0.25) 0%, transparent 60%),
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px);
+  min-height: 100vh; line-height: 1.7;
+}
+.app-shell { max-width: 960px; margin: 0 auto; padding: 40px 20px 80px; }
+
+/* ── App Header ─────────────────────────────────── */
+.app-header { text-align: center; margin-bottom: 48px; }
+.app-header .eyebrow {
+  display: inline-block; background: rgba(37,99,235,0.25); color: #93c5fd;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(147,197,253,0.25); margin-bottom: 20px;
+}
+.app-header h1 { font-family: 'DM Serif Display', serif; font-size: clamp(2.2rem,5vw,3.4rem); color: var(--white); line-height: 1.1; margin-bottom: 14px; }
+.app-header h1 em { font-style: italic; color: #93c5fd; }
+.app-header p { color: #94a3b8; font-size: 1.05rem; max-width: 560px; margin: 0 auto; line-height: 1.7; font-weight: 300; }
+
+/* ── Progress Bar ───────────────────────────────── */
+.progress-bar-wrap { display: flex; align-items: center; margin-bottom: 40px; position: relative; }
+.progress-bar-wrap::before { content:''; position: absolute; top: 18px; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.08); z-index: 0; }
+.progress-bar-fill { position: absolute; top: 18px; left: 0; height: 2px; background: var(--sky); z-index: 1; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+.step-node { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative; z-index: 2; }
+.step-node .bubble { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: var(--muted); transition: all 0.3s ease; }
+.step-node.active .bubble { background: var(--sky); border-color: var(--sky); color: white; box-shadow: 0 0 0 4px rgba(37,99,235,0.25); }
+.step-node.done .bubble { background: var(--green); border-color: var(--green); color: white; }
+.step-node .step-label { font-size: 0.7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; transition: color 0.3s; }
+.step-node.active .step-label { color: #93c5fd; }
+.step-node.done .step-label { color: var(--green); }
+
+/* ── Card ───────────────────────────────────────── */
+.card { background: var(--white); border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; animation: slideUp 0.4s cubic-bezier(0.4,0,0.2,1); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.card-header { background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%); padding: 28px 36px; display: flex; align-items: center; gap: 16px; }
+.card-header h2 { font-family: 'DM Serif Display', serif; color: white; font-size: 1.5rem; }
+.card-header p { color: #94a3b8; font-size: 0.85rem; margin-top: 4px; font-weight: 300; }
+.card-header .icon { width: 48px; height: 48px; background: rgba(255,255,255,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+.card-body { padding: 36px; }
+.step { display: none; } .step.active { display: block; }
+
+/* ── Form ───────────────────────────────────────── */
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--steel); margin-bottom: 8px; }
+input[type="text"], textarea {
+  width: 100%; padding: 13px 16px; border: 2px solid var(--border); border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif; font-size: 1rem; color: var(--text); background: var(--cloud);
+  transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+}
+input:focus, textarea:focus { border-color: var(--sky); box-shadow: 0 0 0 4px rgba(37,99,235,0.12); background: white; }
+input.error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(239,68,68,0.12); }
+.error-msg { font-size: 0.8rem; color: var(--red); margin-top: 5px; font-weight: 500; display: none; }
+
+/* ── Buttons ────────────────────────────────────── */
+.btn { padding: 13px 28px; border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 700; cursor: pointer; border: 2px solid transparent; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 8px; }
+.btn-primary { background: var(--sky); color: white; box-shadow: 0 4px 16px rgba(37,99,235,0.30); }
+.btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(37,99,235,0.35); }
+.btn-secondary { background: transparent; color: var(--steel); border-color: var(--border); }
+.btn-secondary:hover { background: var(--cloud); color: var(--text); }
+.btn-accent { background: var(--accent); color: white; box-shadow: 0 4px 16px rgba(245,158,11,0.30); }
+.btn-accent:hover { background: #d97706; transform: translateY(-1px); }
+.btn-row { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; margin-top: 28px; }
+.hint-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 20px; margin-bottom: 28px; font-size: 0.85rem; color: #1e40af; line-height: 1.7; }
+
+/* ── SWOT 2x2 Factor Input Grid ────────────────── */
+.swot-input-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+@media (max-width: 620px) { .swot-input-grid { grid-template-columns: 1fr; } }
+
+.swot-section {
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.swot-section:focus-within { border-color: var(--sky); }
+.swot-section-header {
+  padding: 14px 18px;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 2px solid var(--border);
+}
+.swot-section-header .sec-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.swot-section-header h3 {
+  font-size: 0.82rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em; color: var(--text);
+}
+.swot-section-header .sec-badge {
+  margin-left: auto;
+  font-size: 0.72rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 999px;
+}
+.swot-section-header .sec-subtitle {
+  font-size: 0.68rem; font-weight: 500; color: var(--steel); margin-left: 4px;
+}
+.swot-section-body { padding: 14px 18px; background: var(--cloud); }
+.swot-factor-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+  animation: rowIn 0.2s ease;
+}
+@keyframes rowIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+.swot-factor-row .row-num {
+  font-size: 0.68rem; font-weight: 700;
+  color: var(--muted); width: 16px; text-align: right; flex-shrink: 0;
+}
+.swot-factor-row .factor-input {
+  flex: 1;
+  padding: 7px 10px !important;
+  font-size: 0.82rem !important;
+  background: white !important;
+  border: 1.5px solid var(--border) !important;
+  border-radius: 8px !important;
+}
+.swot-factor-row .factor-input:focus {
+  border-color: var(--sky) !important;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.10) !important;
+}
+.remove-btn {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: none; background: transparent;
+  color: var(--muted); cursor: pointer; font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s; flex-shrink: 0;
+}
+.remove-btn:hover { background: #fee2e2; color: var(--red); }
+.remove-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+.swot-section-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 10px; gap: 10px;
+}
+.add-btn {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.78rem; font-weight: 700; color: var(--sky);
+  background: rgba(37,99,235,0.08);
+  border: 1.5px dashed rgba(37,99,235,0.3);
+  border-radius: 8px; padding: 6px 12px;
+  cursor: pointer; transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.add-btn:hover { background: rgba(37,99,235,0.15); border-color: var(--sky); }
+.add-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.count-badge {
+  font-size: 0.72rem; font-weight: 700; color: var(--steel);
+  background: white; border-radius: 6px; padding: 4px 10px;
+  border: 1px solid var(--border);
+}
+
+/* ── TOWS Matrix ────────────────────────────────── */
+.tows-matrix {
+  display: grid;
+  grid-template-columns: 200px 1fr 1fr;
+  grid-template-rows: auto auto 1fr 1fr;
+  gap: 2px;
+  background: var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+@media (max-width: 760px) {
+  .tows-matrix { grid-template-columns: 1fr; }
+  .tows-matrix .matrix-corner,
+  .tows-matrix .matrix-col-header,
+  .tows-matrix .matrix-row-header { display: none; }
+}
+.matrix-corner {
+  background: var(--navy);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  grid-row: span 2;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.matrix-corner span {
+  font-family: 'DM Serif Display', serif;
+  color: white; font-size: 1rem; text-align: center; line-height: 1.4;
+}
+.matrix-col-title {
+  padding: 12px 16px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 4px;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.matrix-col-title h4 {
+  font-size: 0.9rem; font-weight: 700; color: white;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.matrix-col-title p { font-size: 0.7rem; color: rgba(255,255,255,0.75); font-weight: 500; }
+.matrix-col-factors {
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.08);
+  font-size: 0.7rem; color: rgba(255,255,255,0.9);
+  line-height: 1.7;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.matrix-row-header {
+  display: flex; flex-direction: column;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.matrix-row-title {
+  padding: 12px 16px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 4px;
+}
+.matrix-row-title h4 {
+  font-size: 0.9rem; font-weight: 700; color: white;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.matrix-row-title p { font-size: 0.7rem; color: rgba(255,255,255,0.75); font-weight: 500; }
+.matrix-row-factors {
+  flex: 1;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.08);
+  font-size: 0.7rem; color: rgba(255,255,255,0.9);
+  line-height: 1.7;
+}
+.matrix-cell {
+  padding: 18px;
+  display: flex; flex-direction: column; gap: 10px;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.matrix-cell .cell-quadrant {
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--muted);
+}
+.matrix-cell .cell-label {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.05rem; font-weight: 400; margin-bottom: 2px;
+}
+.matrix-cell .cell-description {
+  font-size: 0.75rem; color: var(--steel); line-height: 1.55; font-style: italic;
+}
+.matrix-cell textarea {
+  width: 100%; min-height: 90px; resize: vertical;
+  padding: 10px 12px !important; font-size: 0.82rem !important;
+  border: 1.5px solid var(--border) !important;
+  border-radius: 8px !important; background: rgba(255,255,255,0.8) !important;
+  font-family: 'DM Sans', sans-serif; line-height: 1.6;
+  color: var(--text);
+}
+.matrix-cell textarea::placeholder { color: var(--muted); font-size: 0.75rem; }
+.matrix-cell textarea:focus {
+  border-color: var(--sky) !important;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.10) !important;
+  background: white !important;
+}
+
+/* ── Factor Summary Boxes ───────────────────────── */
+.factor-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+@media (max-width: 620px) { .factor-summary-grid { grid-template-columns: 1fr; } }
+.factor-summary-box {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.factor-summary-box .fsb-header {
+  padding: 12px 18px;
+  display: flex; align-items: center; gap: 8px;
+  color: white; font-size: 0.78rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.factor-summary-box .fsb-body {
+  padding: 14px 18px; background: white;
+}
+.factor-summary-box .fsb-body ol {
+  margin: 0; padding-left: 20px;
+}
+.factor-summary-box .fsb-body li {
+  font-size: 0.82rem; color: var(--text); line-height: 1.8;
+}
+
+/* ── Insights Card ──────────────────────────────── */
+.insights-card {
+  background: white; border-radius: 20px; box-shadow: var(--shadow);
+  overflow: hidden; margin-bottom: 28px;
+}
+.insights-header {
+  padding: 24px 28px 20px;
+  border-bottom: 2px solid var(--border);
+  display: flex; align-items: flex-start; gap: 16px;
+}
+.insights-header .icon-big { font-size: 2rem; line-height: 1; }
+.insights-header h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.3rem; color: var(--text); margin-bottom: 4px;
+}
+.insights-header p { color: var(--steel); font-size: 0.88rem; line-height: 1.6; }
+.insights-body { padding: 24px 28px; }
+.insight-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.insight-row:last-child { border-bottom: none; }
+.insight-row .insight-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
+.insight-row .insight-text { font-size: 0.88rem; color: var(--text); line-height: 1.6; }
+.insight-row .insight-text strong { color: var(--text); }
+
+/* ── References ─────────────────────────────────── */
+.references-card {
+  background: white; border-radius: 20px; box-shadow: var(--shadow);
+  overflow: hidden; margin-bottom: 28px;
+}
+.references-card .ref-header {
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--steel);
+}
+.references-card .ref-body {
+  padding: 18px 28px;
+  font-size: 0.8rem; color: var(--steel); line-height: 1.8;
+}
+.references-card .ref-body p { margin-bottom: 6px; }
+.references-card .ref-body p:last-child { margin-bottom: 0; }
+
+/* ── Print ──────────────────────────────────────── */
+.print-only { display: none; }
+@media print {
+  body { background: white !important; color: black; }
+  @page { margin: 1.5cm; }
+  .app-header, .progress-bar-wrap, .no-print, #step1, #step2 { display: none !important; }
+  .print-only { display: block !important; }
+  #step3 { display: block !important; }
+  .card, .insights-card, .references-card { box-shadow: none !important; border: 1px solid #ddd; }
+  .app-shell { padding: 0; max-width: 100%; }
+  .factor-summary-grid { break-inside: avoid; }
+  .tows-matrix { break-inside: avoid; }
+  .insights-card { break-inside: avoid; }
+  .insight-row { break-inside: avoid; }
+  .references-card { break-inside: avoid; }
+  .print-header { text-align: center; padding: 20px 0 30px; border-bottom: 3px solid #1a3a6e; margin-bottom: 24px; }
+  .print-header h1 { font-size: 1.8rem; color: #1a3a6e; font-family: 'DM Serif Display', serif; }
+  .print-header p { color: #666; font-size: 0.9rem; margin-top: 6px; }
+  .matrix-col-title, .matrix-col-factors,
+  .matrix-row-title, .matrix-row-factors,
+  .matrix-corner, .matrix-row-header {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .factor-summary-box .fsb-header {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .matrix-cell textarea {
+    border: 1px solid #ccc !important;
+    background: transparent !important;
+    min-height: 60px;
+    overflow: visible !important;
+    white-space: pre-wrap;
+  }
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <div class="app-header no-print">
+    <div class="eyebrow">Strategic Management Tool</div>
+    <h1>TOWS <em>Matrix</em></h1>
+    <p>Cross-reference internal strengths and weaknesses with external opportunities and threats to systematically generate and evaluate strategic alternatives.</p>
+  </div>
+
+  <div class="progress-bar-wrap no-print" id="progressBar">
+    <div class="progress-bar-fill" id="progressFill" style="width:16%"></div>
+    <div class="step-node active" id="node1"><div class="bubble">1</div><span class="step-label">Company</span></div>
+    <div class="step-node" id="node2"><div class="bubble">2</div><span class="step-label">Factors</span></div>
+    <div class="step-node" id="node3"><div class="bubble">3</div><span class="step-label">Strategies</span></div>
+  </div>
+
+  <!-- ═══════════ STEP 1 ═══════════ -->
+  <div class="step active" id="step1">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">&#x1F3E2;</div>
+        <div><h2>Company Information</h2><p>Identify the organization being analyzed</p></div>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="companyName">Company Name *</label>
+          <input type="text" id="companyName" placeholder="e.g. Apple Inc." aria-label="Company Name">
+          <div class="error-msg" id="err-company">Please enter a company name to continue.</div>
+        </div>
+        <div class="form-group">
+          <label for="companyIndustry">Industry / Sector</label>
+          <input type="text" id="companyIndustry" placeholder="e.g. Consumer Electronics" aria-label="Industry or Sector">
+        </div>
+        <div class="form-group">
+          <label for="analystName">Analyst Name</label>
+          <input type="text" id="analystName" placeholder="e.g. Jane Smith" aria-label="Analyst Name">
+        </div>
+        <div class="form-group">
+          <label for="analysisDate">Date</label>
+          <input type="text" id="analysisDate" placeholder="" aria-label="Analysis Date">
+        </div>
+
+        <div class="hint-box">
+          <strong>About the TOWS Matrix:</strong><br>
+          The TOWS Matrix, developed by Weihrich (1982), is a structured extension of the SWOT framework specifically designed for strategy generation. While SWOT identifies factors, TOWS cross-references them to produce four categories of strategic alternatives:<br><br>
+          &bull; <strong>S-O Strategies (Maxi-Maxi)</strong> &mdash; Use strengths to exploit opportunities (most aggressive growth strategies)<br>
+          &bull; <strong>W-O Strategies (Mini-Maxi)</strong> &mdash; Overcome weaknesses by leveraging opportunities (turnaround strategies)<br>
+          &bull; <strong>S-T Strategies (Maxi-Mini)</strong> &mdash; Deploy strengths to neutralize or avoid threats (competitive defense strategies)<br>
+          &bull; <strong>W-T Strategies (Mini-Mini)</strong> &mdash; Minimize weaknesses and avoid threats (retrenchment or survival strategies)<br><br>
+          In the results matrix, your specific factors appear in the row and column headers so each strategy cell explicitly references which factor combinations it addresses.
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnToStep2">Continue to Factors &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 2 ═══════════ -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">&#x1F4CB;</div>
+        <div><h2>SWOT Factors</h2><p>Identify the internal and external factors that will populate the TOWS Matrix</p></div>
+      </div>
+      <div class="card-body">
+        <div class="hint-box">
+          <strong>&#x1F4D8; How to use this tool:</strong><br>
+          &bull; <strong>Strengths (S)</strong>: Internal advantages your organization possesses over competitors (distinctive capabilities, proprietary assets, superior resources).<br>
+          &bull; <strong>Weaknesses (W)</strong>: Internal limitations or deficiencies that place the organization at a competitive disadvantage.<br>
+          &bull; <strong>Opportunities (O)</strong>: External trends or conditions the organization could exploit for competitive advantage (market growth, technology shifts, regulatory change).<br>
+          &bull; <strong>Threats (T)</strong>: External forces that could negatively affect performance (competitive moves, economic downturns, disruptive technology).<br>
+          &bull; Enter at least <strong>1 factor per section</strong>. You may add up to 10 factors per section.<br>
+          &bull; Your factors will appear in the TOWS Matrix headers on the next screen so you can cross-reference them when writing strategies.
+        </div>
+
+        <div class="swot-input-grid" id="swotInputGrid"></div>
+
+        <div id="form-error" style="display:none; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:20px; color:#dc2626; font-size:0.85rem; font-weight:500;"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="goToStep1()">&larr; Back</button>
+          <button class="btn btn-primary" onclick="generateResults()">Build TOWS Matrix &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 3 ═══════════ -->
+  <div class="step" id="step3">
+    <div class="print-only print-header">
+      <h1 id="print-title">TOWS Matrix</h1>
+      <p id="print-meta"></p>
+    </div>
+
+    <!-- Factor Summary -->
+    <div class="factor-summary-grid" id="factorSummaryGrid"></div>
+
+    <!-- TOWS Strategy Matrix -->
+    <div class="tows-matrix" id="towsMatrix"></div>
+
+    <!-- Strategic Guidance -->
+    <div class="insights-card" id="insightsCard"></div>
+
+    <!-- References -->
+    <div class="references-card">
+      <div class="ref-header">References</div>
+      <div class="ref-body">
+        <p>Weihrich, H. (1982). The TOWS matrix &mdash; A tool for situational analysis. <em>Long Range Planning, 15</em>(2), 54&ndash;66. https://doi.org/10.1016/0024-6301(82)90120-0</p>
+        <p>David, F. R., &amp; David, F. R. (2017). <em>Strategic management: A competitive advantage approach, concepts and cases</em> (16th ed.). Pearson.</p>
+        <p><em>Note:</em> The TOWS Matrix is an analytical framework derived from the foundational SWOT construct. This tool presents the framework for educational purposes consistent with GCU academic guidelines.</p>
+      </div>
+    </div>
+
+    <div class="btn-row no-print">
+      <button class="btn btn-secondary" onclick="goToStep2()">&larr; Edit Factors</button>
+      <button class="btn btn-secondary" onclick="resetAll()">&#x21BA; Start Over</button>
+      <button class="btn btn-accent" onclick="window.print()">&#x1F5A8;&#xFE0F; Print / Save PDF</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   TOWS Matrix Tool — JavaScript
+   ═══════════════════════════════════════════════════════ */
+
+const MAX_ROWS = 10, MIN_ROWS = 1;
+
+const SECTIONS = [
+  {
+    id: 'strengths',
+    abbr: 'S',
+    name: 'Strengths',
+    subtitle: 'Internal Positive',
+    color: '#16a34a',
+    headerBg: '#f0fdf4',
+    chipBg: '#dcfce7',
+    chipColor: '#15803d',
+    placeholder: 'e.g. Strong brand recognition'
+  },
+  {
+    id: 'weaknesses',
+    abbr: 'W',
+    name: 'Weaknesses',
+    subtitle: 'Internal Negative',
+    color: '#dc2626',
+    headerBg: '#fef2f2',
+    chipBg: '#fee2e2',
+    chipColor: '#b91c1c',
+    placeholder: 'e.g. High manufacturing costs'
+  },
+  {
+    id: 'opportunities',
+    abbr: 'O',
+    name: 'Opportunities',
+    subtitle: 'External Positive',
+    color: '#0891b2',
+    headerBg: '#ecfeff',
+    chipBg: '#cffafe',
+    chipColor: '#0e7490',
+    placeholder: 'e.g. Growing Asian markets'
+  },
+  {
+    id: 'threats',
+    abbr: 'T',
+    name: 'Threats',
+    subtitle: 'External Negative',
+    color: '#ea580c',
+    headerBg: '#fff7ed',
+    chipBg: '#ffedd5',
+    chipColor: '#c2410c',
+    placeholder: 'e.g. Increasing raw material costs'
+  }
+];
+
+let results = {};
+
+/* ── Date ───────────────────────────────────────── */
+(function() {
+  var now = new Date();
+  var m = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('analysisDate').value = m[now.getMonth()] + ' ' + now.getFullYear();
+})();
+
+/* ── Navigation ─────────────────────────────────── */
+function setStep(n) {
+  document.querySelectorAll('.step').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById('step' + n).classList.add('active');
+  for (var i = 1; i <= 3; i++) {
+    var node = document.getElementById('node' + i);
+    node.classList.remove('active','done');
+    if (i < n) node.classList.add('done');
+    else if (i === n) node.classList.add('active');
+  }
+  document.getElementById('progressFill').style.width = (n === 1 ? 16 : n === 2 ? 50 : 92) + '%';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function goToStep1() { setStep(1); }
+function goToStep2() { setStep(2); }
+
+/* ── Step 1 Validation ──────────────────────────── */
+document.getElementById('btnToStep2').onclick = function() {
+  var name = document.getElementById('companyName').value.trim();
+  var err = document.getElementById('err-company');
+  if (!name) {
+    document.getElementById('companyName').classList.add('error');
+    err.style.display = 'block';
+    return;
+  }
+  document.getElementById('companyName').classList.remove('error');
+  err.style.display = 'none';
+  setStep(2);
+};
+
+/* ── Build SWOT Input Sections ─────────────────── */
+function buildSections() {
+  var grid = document.getElementById('swotInputGrid');
+  grid.innerHTML = '';
+  SECTIONS.forEach(function(sec) {
+    var box = document.createElement('div');
+    box.className = 'swot-section';
+    box.id = 'sec-' + sec.id;
+    box.innerHTML =
+      '<div class="swot-section-header" style="background:' + sec.headerBg + '">' +
+        '<div class="sec-dot" style="background:' + sec.color + '"></div>' +
+        '<h3>' + sec.name + '</h3>' +
+        '<span class="sec-subtitle">' + sec.subtitle + '</span>' +
+        '<span class="sec-badge" style="background:' + sec.chipBg + ';color:' + sec.chipColor + '">' + sec.abbr + '</span>' +
+      '</div>' +
+      '<div class="swot-section-body">' +
+        '<div class="factor-list" id="factors-' + sec.id + '"></div>' +
+        '<div class="swot-section-footer">' +
+          '<button class="add-btn" id="add-' + sec.id + '" onclick="addFactor(\'' + sec.id + '\')">' +
+            '<span style="font-size:1.1rem;line-height:1">+</span> Add ' + sec.name.slice(0, -1).replace(/ie$/, 'y') +
+          '</button>' +
+          '<span class="count-badge" id="count-' + sec.id + '">0 factors</span>' +
+        '</div>' +
+      '</div>';
+    grid.appendChild(box);
+    for (var r = 0; r < 3; r++) { addFactor(sec.id); }
+  });
+}
+
+function addFactor(secId, labelText) {
+  var sec = SECTIONS.find(function(x) { return x.id === secId; });
+  var list = document.getElementById('factors-' + secId);
+  if (list.querySelectorAll('.swot-factor-row').length >= MAX_ROWS) return;
+
+  var row = document.createElement('div');
+  row.className = 'swot-factor-row';
+
+  var num = document.createElement('span');
+  num.className = 'row-num';
+  num.textContent = list.querySelectorAll('.swot-factor-row').length + 1;
+
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'factor-input';
+  inp.placeholder = sec.placeholder;
+  inp.value = labelText || '';
+  inp.maxLength = 80;
+  inp.setAttribute('aria-label', sec.name + ' factor');
+  inp.addEventListener('input', function() { updateCounts(); });
+
+  var delBtn = document.createElement('button');
+  delBtn.className = 'remove-btn';
+  delBtn.title = 'Remove this factor';
+  delBtn.innerHTML = '\u2715';
+  delBtn.onclick = function() { removeFactor(secId, row); };
+
+  row.appendChild(num);
+  row.appendChild(inp);
+  row.appendChild(delBtn);
+  list.appendChild(row);
+  updateRowNums(secId);
+  updateCounts();
+  if (labelText === undefined && list.querySelectorAll('.swot-factor-row').length > 3) inp.focus();
+}
+
+function removeFactor(secId, rowEl) {
+  var list = document.getElementById('factors-' + secId);
+  if (list.querySelectorAll('.swot-factor-row').length <= MIN_ROWS) return;
+  rowEl.style.cssText = 'opacity:0;transform:translateX(8px);transition:opacity 0.18s,transform 0.18s;';
+  setTimeout(function() { rowEl.remove(); updateRowNums(secId); updateCounts(); }, 190);
+}
+
+function updateRowNums(secId) {
+  var rows = document.querySelectorAll('#factors-' + secId + ' .swot-factor-row');
+  rows.forEach(function(r, i) {
+    r.querySelector('.row-num').textContent = i + 1;
+    r.querySelector('.remove-btn').disabled = (rows.length <= MIN_ROWS);
+  });
+  var btn = document.getElementById('add-' + secId);
+  if (btn) btn.disabled = rows.length >= MAX_ROWS;
+}
+
+function updateCounts() {
+  SECTIONS.forEach(function(sec) {
+    var filled = getFactors(sec.id).length;
+    var total = document.querySelectorAll('#factors-' + sec.id + ' .swot-factor-row').length;
+    var el = document.getElementById('count-' + sec.id);
+    if (el) el.textContent = filled + ' of ' + total + ' filled';
+  });
+}
+
+function getFactors(secId) {
+  var rows = document.querySelectorAll('#factors-' + secId + ' .swot-factor-row');
+  var factors = [];
+  rows.forEach(function(row) {
+    var val = row.querySelector('.factor-input').value.trim();
+    if (val) factors.push(val);
+  });
+  return factors;
+}
+
+/* ── Generate Results ───────────────────────────── */
+function generateResults() {
+  var errBox = document.getElementById('form-error');
+  errBox.style.display = 'none';
+  var errors = [];
+
+  var strengths    = getFactors('strengths');
+  var weaknesses   = getFactors('weaknesses');
+  var opportunities = getFactors('opportunities');
+  var threats      = getFactors('threats');
+
+  if (strengths.length === 0)     errors.push('Enter at least 1 Strength factor.');
+  if (weaknesses.length === 0)    errors.push('Enter at least 1 Weakness factor.');
+  if (opportunities.length === 0) errors.push('Enter at least 1 Opportunity factor.');
+  if (threats.length === 0)       errors.push('Enter at least 1 Threat factor.');
+
+  if (errors.length) {
+    errBox.innerHTML = errors.join('<br>');
+    errBox.style.display = 'block';
+    return;
+  }
+
+  results = {
+    company: document.getElementById('companyName').value.trim(),
+    industry: document.getElementById('companyIndustry').value.trim(),
+    analyst: document.getElementById('analystName').value.trim(),
+    date: document.getElementById('analysisDate').value.trim(),
+    strengths: strengths,
+    weaknesses: weaknesses,
+    opportunities: opportunities,
+    threats: threats
+  };
+
+  buildFactorSummary();
+  buildTowsMatrix();
+  buildInsightsPanel();
+  updatePrintHeader();
+  setStep(3);
+}
+
+/* ── Factor Summary Boxes ──────────────────────── */
+function buildFactorSummary() {
+  var grid = document.getElementById('factorSummaryGrid');
+  var groups = [
+    { label: 'Strengths',     abbr: 'S', color: '#16a34a', factors: results.strengths },
+    { label: 'Weaknesses',    abbr: 'W', color: '#dc2626', factors: results.weaknesses },
+    { label: 'Opportunities', abbr: 'O', color: '#0891b2', factors: results.opportunities },
+    { label: 'Threats',       abbr: 'T', color: '#ea580c', factors: results.threats }
+  ];
+  grid.innerHTML = groups.map(function(g) {
+    return '<div class="factor-summary-box">' +
+      '<div class="fsb-header" style="background:' + g.color + '">' +
+        '<strong>' + g.abbr + '</strong>&nbsp;&mdash;&nbsp;' + g.label + ' (' + g.factors.length + ')' +
+      '</div>' +
+      '<div class="fsb-body"><ol>' +
+        g.factors.map(function(f) { return '<li>' + escHtml(f) + '</li>'; }).join('') +
+      '</ol></div>' +
+    '</div>';
+  }).join('');
+}
+
+/* ── TOWS Strategy Matrix ───────────────────────── */
+function buildTowsMatrix() {
+  var r = results;
+  var matrix = document.getElementById('towsMatrix');
+
+  /* Factor lists for header cells */
+  var sList = r.strengths.map(function(s, i)    { return '<strong>S' + (i+1) + '.</strong> ' + escHtml(s); }).join('<br>');
+  var wList = r.weaknesses.map(function(w, i)   { return '<strong>W' + (i+1) + '.</strong> ' + escHtml(w); }).join('<br>');
+  var oList = r.opportunities.map(function(o, i){ return '<strong>O' + (i+1) + '.</strong> ' + escHtml(o); }).join('<br>');
+  var tList = r.threats.map(function(t, i)      { return '<strong>T' + (i+1) + '.</strong> ' + escHtml(t); }).join('<br>');
+
+  matrix.innerHTML =
+    /* ── Row 1: Corner  +  Strengths header  +  Weaknesses header ── */
+    '<div class="matrix-corner" style="background:' + '#0f2342' + '">' +
+      '<span>' + escHtml(r.company) + '<br><span style="font-size:0.7rem;opacity:0.6;font-family:\'DM Sans\',sans-serif;font-weight:500;">TOWS Matrix</span></span>' +
+    '</div>' +
+
+    '<div class="matrix-col-title" style="background:#16a34a;">' +
+      '<h4>Strengths (S)</h4><p>Internal Positive Factors</p>' +
+    '</div>' +
+    '<div class="matrix-col-title" style="background:#dc2626;">' +
+      '<h4>Weaknesses (W)</h4><p>Internal Negative Factors</p>' +
+    '</div>' +
+
+    /* ── Row 2: (corner spans row 1+2)  +  S factors  +  W factors ── */
+    '<div class="matrix-col-factors" style="background:rgba(22,163,74,0.12);border-top:1px solid rgba(22,163,74,0.2);">' + sList + '</div>' +
+    '<div class="matrix-col-factors" style="background:rgba(220,38,38,0.10);border-top:1px solid rgba(220,38,38,0.2);">' + wList + '</div>' +
+
+    /* ── Row 3: O row header  +  S-O cell  +  W-O cell ── */
+    '<div class="matrix-row-header" style="background:#0891b2;">' +
+      '<div class="matrix-row-title"><h4>Opportunities (O)</h4><p>External Positive Factors</p></div>' +
+      '<div class="matrix-row-factors">' + oList + '</div>' +
+    '</div>' +
+
+    '<div class="matrix-cell" style="background:#f0fdf9;">' +
+      '<div class="cell-quadrant">Maxi-Maxi &nbsp;&bull;&nbsp; S-O</div>' +
+      '<div class="cell-label" style="color:#16a34a;">S-O Strategies</div>' +
+      '<div class="cell-description">Use internal strengths to exploit external opportunities. These are your most aggressive, growth-oriented moves.</div>' +
+      '<textarea id="soStrategies" placeholder="Example: Use S1 (brand recognition) + O2 (emerging market growth) to launch premium product line in Southeast Asia." aria-label="S-O Strategies"></textarea>' +
+    '</div>' +
+
+    '<div class="matrix-cell" style="background:#ecfeff;">' +
+      '<div class="cell-quadrant">Mini-Maxi &nbsp;&bull;&nbsp; W-O</div>' +
+      '<div class="cell-label" style="color:#0891b2;">W-O Strategies</div>' +
+      '<div class="cell-description">Overcome internal weaknesses by taking advantage of external opportunities. Turnaround or improvement strategies.</div>' +
+      '<textarea id="woStrategies" placeholder="Example: Address W1 (high costs) through O3 (automation technology) to reduce production overhead by 20%." aria-label="W-O Strategies"></textarea>' +
+    '</div>' +
+
+    /* ── Row 4: T row header  +  S-T cell  +  W-T cell ── */
+    '<div class="matrix-row-header" style="background:#ea580c;">' +
+      '<div class="matrix-row-title"><h4>Threats (T)</h4><p>External Negative Factors</p></div>' +
+      '<div class="matrix-row-factors">' + tList + '</div>' +
+    '</div>' +
+
+    '<div class="matrix-cell" style="background:#fff7ed;">' +
+      '<div class="cell-quadrant">Maxi-Mini &nbsp;&bull;&nbsp; S-T</div>' +
+      '<div class="cell-label" style="color:#ea580c;">S-T Strategies</div>' +
+      '<div class="cell-description">Deploy internal strengths to neutralize or minimize the impact of external threats. Competitive defense strategies.</div>' +
+      '<textarea id="stStrategies" placeholder="Example: Leverage S2 (strong R&D) to differentiate against T1 (new competitor entry) with patented product features." aria-label="S-T Strategies"></textarea>' +
+    '</div>' +
+
+    '<div class="matrix-cell" style="background:#fef2f2;">' +
+      '<div class="cell-quadrant">Mini-Mini &nbsp;&bull;&nbsp; W-T</div>' +
+      '<div class="cell-label" style="color:#dc2626;">W-T Strategies</div>' +
+      '<div class="cell-description">Minimize internal weaknesses and avoid external threats. Defensive retrenchment or survival strategies.</div>' +
+      '<textarea id="wtStrategies" placeholder="Example: Reduce W2 (geographic concentration) before T2 (regional regulatory risk) materializes by diversifying to new markets." aria-label="W-T Strategies"></textarea>' +
+    '</div>';
+}
+
+/* ── Strategic Guidance Panel ──────────────────── */
+function buildInsightsPanel() {
+  var r = results;
+  var sCount = r.strengths.length;
+  var wCount = r.weaknesses.length;
+  var oCount = r.opportunities.length;
+  var tCount = r.threats.length;
+
+  var combos = [
+    { label: 'S-O (Maxi-Maxi / Aggressive Growth)', type: 'S-O', count: sCount + oCount, color: '#16a34a',
+      desc: 'Prioritize strategies that exploit your strongest capabilities against the most attractive opportunities. This is the highest-leverage quadrant when the organization has real positional advantages.' },
+    { label: 'W-O (Mini-Maxi / Turnaround)', type: 'W-O', count: wCount + oCount, color: '#0891b2',
+      desc: 'Invest in resolving critical weaknesses where doing so would unlock valuable opportunities. Consider partnerships, acquisitions, or capability-building investments.' },
+    { label: 'S-T (Maxi-Mini / Competitive Defense)', type: 'S-T', count: sCount + tCount, color: '#ea580c',
+      desc: 'Use distinctive competencies as a shield. Differentiation, patent protection, and market lock-in strategies fit here.' },
+    { label: 'W-T (Mini-Mini / Retrenchment)', type: 'W-T', count: wCount + tCount, color: '#dc2626',
+      desc: 'Defensive moves: divest non-core units, cut exposure to vulnerable markets, or reduce resource commitments until the environment improves.' }
+  ];
+  combos.sort(function(a, b) { return b.count - a.count; });
+  var dominant = combos[0];
+
+  var internalBalance = sCount > wCount
+    ? r.company + ' has more identified strengths (' + sCount + ') than weaknesses (' + wCount + '), suggesting an internal position that favors aggressive or defensive strategies.'
+    : wCount > sCount
+    ? r.company + ' has more identified weaknesses (' + wCount + ') than strengths (' + sCount + '), suggesting that internal capability building should accompany any external strategic move.'
+    : r.company + ' has an even internal profile (' + sCount + ' strengths, ' + wCount + ' weaknesses), requiring careful selection of which strengths to deploy and which weaknesses to protect.';
+
+  var externalBalance = oCount > tCount
+    ? 'The external environment leans favorable (' + oCount + ' opportunities vs. ' + tCount + ' threats), supporting an opportunistic stance for ' + r.company + '.'
+    : tCount > oCount
+    ? 'The external environment leans threatening (' + tCount + ' threats vs. ' + oCount + ' opportunities), urging ' + r.company + ' toward defensive and consolidation strategies.'
+    : 'The external environment is evenly balanced (' + oCount + ' opportunities, ' + tCount + ' threats), requiring ' + r.company + ' to prioritize carefully.';
+
+  var card = document.getElementById('insightsCard');
+  card.innerHTML =
+    '<div class="insights-header">' +
+      '<div class="icon-big">&#x1F9ED;</div>' +
+      '<div>' +
+        '<h3>Strategic Guidance</h3>' +
+        '<p>' + escHtml(r.company) + ' &mdash; TOWS Analysis Summary</p>' +
+      '</div>' +
+    '</div>' +
+    '<div class="insights-body">' +
+      '<div class="insight-row">' +
+        '<span class="insight-icon">&#x1F3AF;</span>' +
+        '<div class="insight-text">Your factor counts suggest the <strong style="color:' + dominant.color + '">' + dominant.label + '</strong> quadrant has the most raw material (' + dominant.count + ' factors). ' + dominant.desc + '</div>' +
+      '</div>' +
+      '<div class="insight-row">' +
+        '<span class="insight-icon">&#x1F4C8;</span>' +
+        '<div class="insight-text">' + internalBalance + '</div>' +
+      '</div>' +
+      '<div class="insight-row">' +
+        '<span class="insight-icon">&#x1F30D;</span>' +
+        '<div class="insight-text">' + externalBalance + '</div>' +
+      '</div>' +
+      '<div class="insight-row">' +
+        '<span class="insight-icon">&#x270D;&#xFE0F;</span>' +
+        '<div class="insight-text">When writing strategies, reference specific factor codes (e.g., "Use S2 + O1 to...") so each strategy is traceable to the factors that justify it. Aim for 2&ndash;4 distinct strategies per quadrant.</div>' +
+      '</div>' +
+      '<div class="insight-row">' +
+        '<span class="insight-icon">&#x1F4A1;</span>' +
+        '<div class="insight-text">The quadrant priority order suggested by your factor counts: ' +
+          combos.map(function(c, i) { return '<strong style="color:' + c.color + '">' + (i+1) + '. ' + c.type + '</strong>'; }).join(' &rarr; ') +
+        '. Allocate strategy-writing effort accordingly.</div>' +
+      '</div>' +
+    '</div>';
+}
+
+/* ── Print Header ──────────────────────────────── */
+function updatePrintHeader() {
+  document.getElementById('print-title').textContent = 'TOWS Matrix \u2014 ' + results.company;
+  var meta = [];
+  if (results.industry) meta.push(results.industry);
+  if (results.analyst)  meta.push('Analyst: ' + results.analyst);
+  if (results.date)     meta.push(results.date);
+  document.getElementById('print-meta').textContent = meta.join('  |  ');
+}
+
+/* ── Reset ──────────────────────────────────────── */
+function resetAll() {
+  results = {};
+  ['companyName','companyIndustry','analystName','analysisDate']
+    .forEach(function(id) { var el = document.getElementById(id); if(el) el.value = ''; });
+  buildSections();
+  setStep(1);
+}
+
+/* ── Utility ───────────────────────────────────── */
+function escHtml(str) {
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
+/* ── Initialize ────────────────────────────────── */
+buildSections();
+</script>
+</body>
+</html>

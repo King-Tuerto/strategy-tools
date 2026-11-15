@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BCG Growth-Share Matrix Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens ──────────────────────────────── */
+:root {
+  --navy:   #0f2342;
+  --cobalt: #1a3a6e;
+  --sky:    #2563eb;
+  --steel:  #64748b;
+  --cloud:  #f1f5f9;
+  --white:  #ffffff;
+  --accent: #f59e0b;
+  --green:  #10b981;
+  --red:    #ef4444;
+  --orange: #f97316;
+  --text:   #1e293b;
+  --muted:  #94a3b8;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow:    0 4px 24px rgba(15,35,66,0.10);
+  --shadow-lg: 0 12px 48px rgba(15,35,66,0.16);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text);
+  background: var(--navy);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%,
+      rgba(37,99,235,0.25) 0%, transparent 60%),
+    repeating-linear-gradient(0deg,
+      transparent, transparent 39px,
+      rgba(255,255,255,0.02) 39px,
+      rgba(255,255,255,0.02) 40px),
+    repeating-linear-gradient(90deg,
+      transparent, transparent 39px,
+      rgba(255,255,255,0.02) 39px,
+      rgba(255,255,255,0.02) 40px);
+  min-height: 100vh;
+  line-height: 1.7;
+}
+
+.app-shell { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; }
+
+/* ── App Header ─────────────────────────────────── */
+.app-header { text-align: center; margin-bottom: 48px; }
+.app-header .eyebrow {
+  display: inline-block;
+  background: rgba(37,99,235,0.25); color: #93c5fd;
+  font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 6px 16px; border-radius: 999px;
+  border: 1px solid rgba(147,197,253,0.25); margin-bottom: 20px;
+}
+.app-header h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  color: var(--white); line-height: 1.1; margin-bottom: 14px;
+}
+.app-header h1 em { font-style: italic; color: #93c5fd; }
+.app-header p {
+  color: #94a3b8; font-size: 1.05rem;
+  max-width: 520px; margin: 0 auto; line-height: 1.7; font-weight: 300;
+}
+
+/* ── Progress Bar ───────────────────────────────── */
+.progress-bar-wrap {
+  display: flex; align-items: center;
+  margin-bottom: 40px; position: relative;
+}
+.progress-bar-wrap::before {
+  content: ''; position: absolute;
+  top: 18px; left: 0; right: 0;
+  height: 2px; background: rgba(255,255,255,0.08); z-index: 0;
+}
+.progress-bar-fill {
+  position: absolute; top: 18px; left: 0;
+  height: 2px; background: var(--sky); z-index: 1;
+  transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+.step-node {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; position: relative; z-index: 2;
+}
+.step-node .bubble {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  border: 2px solid rgba(255,255,255,0.12);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; font-weight: 700;
+  color: var(--muted); transition: all 0.3s ease;
+}
+.step-node.active .bubble {
+  background: var(--sky); border-color: var(--sky);
+  color: white; box-shadow: 0 0 0 4px rgba(37,99,235,0.25);
+}
+.step-node.done .bubble { background: var(--green); border-color: var(--green); color: white; }
+.step-node .step-label {
+  font-size: 0.7rem; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.08em; transition: color 0.3s;
+}
+.step-node.active .step-label { color: #93c5fd; }
+.step-node.done .step-label   { color: var(--green); }
+
+/* ── Card ───────────────────────────────────────── */
+.card {
+  background: var(--white); border-radius: 20px;
+  box-shadow: var(--shadow-lg); overflow: hidden;
+  animation: slideUp 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card-header {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%);
+  padding: 28px 36px; display: flex; align-items: center; gap: 16px;
+}
+.card-header h2 {
+  font-family: 'DM Serif Display', serif; color: white; font-size: 1.5rem;
+}
+.card-header p { color: #94a3b8; font-size: 0.85rem; margin-top: 4px; font-weight: 300; }
+.card-header .icon {
+  width: 48px; height: 48px;
+  background: rgba(255,255,255,0.1); border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; flex-shrink: 0;
+}
+.card-body { padding: 36px; }
+
+/* ── Steps ──────────────────────────────────────── */
+.step { display: none; }
+.step.active { display: block; }
+
+/* ── Form ───────────────────────────────────────── */
+.form-group { margin-bottom: 20px; }
+.form-group label {
+  display: block; font-size: 0.82rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--steel); margin-bottom: 8px;
+}
+input[type="text"],
+input[type="number"],
+textarea {
+  width: 100%; padding: 13px 16px;
+  border: 2px solid var(--border); border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif; font-size: 1rem;
+  color: var(--text); background: var(--cloud);
+  transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+}
+input:focus, textarea:focus {
+  border-color: var(--sky);
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.12); background: white;
+}
+input.error {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
+}
+.error-msg {
+  font-size: 0.8rem; color: var(--red);
+  margin-top: 5px; font-weight: 500; display: none;
+}
+
+/* ── Buttons ────────────────────────────────────── */
+.btn {
+  padding: 13px 28px; border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif; font-size: 0.9rem;
+  font-weight: 700; cursor: pointer; border: 2px solid transparent;
+  transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 8px;
+}
+.btn-primary { background: var(--sky); color: white; box-shadow: 0 4px 16px rgba(37,99,235,0.30); }
+.btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(37,99,235,0.35); }
+.btn-secondary { background: transparent; color: var(--steel); border-color: var(--border); }
+.btn-secondary:hover { background: var(--cloud); color: var(--text); }
+.btn-accent { background: var(--accent); color: white; box-shadow: 0 4px 16px rgba(245,158,11,0.30); }
+.btn-accent:hover { background: #d97706; transform: translateY(-1px); }
+.btn-row { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; margin-top: 28px; }
+
+/* ── Hint Box ───────────────────────────────────── */
+.hint-box {
+  background: #eff6ff; border: 1px solid #bfdbfe;
+  border-radius: 12px; padding: 18px 20px;
+  margin-bottom: 28px; font-size: 0.85rem;
+  color: #1e40af; line-height: 1.7;
+}
+
+/* ── BU Table ───────────────────────────────────── */
+.bu-table-wrap {
+  border: 2px solid var(--border); border-radius: 16px;
+  overflow: hidden; margin-bottom: 24px;
+}
+.bu-table-header {
+  padding: 14px 18px; display: flex; align-items: center; gap: 10px;
+  border-bottom: 2px solid var(--border); background: #fefce8;
+}
+.bu-table-header .dim-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: #f59e0b; }
+.bu-table-header h3 {
+  font-size: 0.82rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em; color: var(--text);
+}
+.bu-table-body { padding: 14px 18px; background: var(--cloud); }
+
+/* Threshold fields */
+.threshold-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  margin-bottom: 20px;
+}
+.threshold-group label {
+  display: block; font-size: 0.78rem; font-weight: 700;
+  color: var(--steel); text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.threshold-group input {
+  width: 100%; padding: 10px 14px !important;
+  font-size: 0.9rem !important; background: white !important;
+  border: 1.5px solid var(--border) !important; border-radius: 8px !important;
+}
+.threshold-group .hint-text {
+  font-size: 0.7rem; color: var(--muted); margin-top: 4px;
+}
+
+/* Column headers */
+.col-headers {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.col-headers span {
+  font-size: 0.68rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.07em;
+}
+.col-headers .ch-num   { width: 16px; flex-shrink: 0; }
+.col-headers .ch-name  { flex: 1; }
+.col-headers .ch-share { width: 90px; text-align: center; flex-shrink: 0; }
+.col-headers .ch-growth { width: 90px; text-align: center; flex-shrink: 0; }
+.col-headers .ch-rev   { width: 90px; text-align: center; flex-shrink: 0; }
+.col-headers .ch-del   { width: 26px; flex-shrink: 0; }
+
+/* BU rows */
+.bu-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px; animation: rowIn 0.2s ease;
+}
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.bu-row .row-num {
+  font-size: 0.68rem; font-weight: 700; color: var(--muted);
+  width: 16px; text-align: right; flex-shrink: 0;
+}
+.bu-row .name-input {
+  flex: 1; padding: 7px 10px !important; font-size: 0.82rem !important;
+  background: white !important;
+  border: 1.5px solid var(--border) !important; border-radius: 8px !important;
+}
+.bu-row .name-input:focus {
+  border-color: var(--sky) !important;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.10) !important;
+}
+.bu-row .data-input {
+  width: 90px !important; text-align: center !important;
+  padding: 7px 8px !important; font-size: 0.88rem !important;
+  background: white !important;
+  border: 1.5px solid var(--border) !important; border-radius: 8px !important;
+  flex-shrink: 0;
+}
+.remove-btn {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: none; background: transparent; color: var(--muted);
+  cursor: pointer; font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s; flex-shrink: 0;
+}
+.remove-btn:hover { background: #fee2e2; color: var(--red); }
+.remove-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+.bu-footer { margin-top: 10px; }
+.add-btn {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.78rem; font-weight: 700; color: var(--sky);
+  background: rgba(37,99,235,0.08);
+  border: 1.5px dashed rgba(37,99,235,0.3);
+  border-radius: 8px; padding: 6px 12px;
+  cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+}
+.add-btn:hover { background: rgba(37,99,235,0.15); border-color: var(--sky); }
+.add-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Form Error ─────────────────────────────────── */
+#form-error {
+  background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 8px; padding: 12px 16px;
+  margin-bottom: 20px; color: #dc2626;
+  font-size: 0.85rem; font-weight: 500;
+}
+
+/* ── Results ────────────────────────────────────── */
+.score-summary {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px;
+}
+.score-table { width: 100%; border-collapse: collapse; }
+.score-table th {
+  background: var(--cloud); padding: 12px 20px;
+  text-align: left; font-size: 0.75rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--steel); border-bottom: 2px solid var(--border);
+}
+.score-table td {
+  padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 0.9rem;
+}
+.score-table tr:last-child td { border-bottom: none; }
+.score-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 700; gap: 4px;
+}
+
+/* ── Chart Wrap ─────────────────────────────────── */
+.chart-wrap {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow-lg); overflow: hidden; margin-bottom: 28px;
+}
+.chart-topbar {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%);
+  padding: 20px 28px; display: flex; align-items: center; justify-content: space-between;
+}
+.chart-topbar h3 {
+  font-family: 'DM Serif Display', serif; color: white; font-size: 1.2rem;
+}
+.chart-topbar .chart-icon {
+  width: 40px; height: 40px;
+  background: rgba(255,255,255,0.1); border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; flex-shrink: 0;
+}
+.chart-topbar-left { display: flex; align-items: center; gap: 12px; }
+.quadrant-badge {
+  padding: 6px 16px; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+canvas#matrixCanvas {
+  display: block; width: 100%; max-width: 700px;
+  margin: 0 auto; padding: 20px;
+}
+
+/* ── Strategy Card ──────────────────────────────── */
+.strategy-card {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow); overflow: hidden; margin-bottom: 28px;
+}
+.strategy-header {
+  padding: 24px 28px 20px; border-bottom: 2px solid var(--border);
+  display: flex; align-items: flex-start; gap: 16px;
+}
+.strategy-header .icon-big { font-size: 2rem; line-height: 1; }
+.strategy-header h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.3rem; color: var(--text); margin-bottom: 4px;
+}
+.strategy-header p { color: var(--steel); font-size: 0.88rem; line-height: 1.6; }
+.strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.strategy-item {
+  padding: 20px 24px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.strategy-item:hover { background: var(--cloud); }
+.strategy-item:nth-child(even) { border-right: none; }
+.strategy-item:nth-last-child(-n+2) { border-bottom: none; }
+.strategy-item h4 {
+  font-size: 0.88rem; font-weight: 700; margin-bottom: 6px;
+  display: flex; align-items: center; gap: 8px;
+}
+.strategy-item p { font-size: 0.82rem; color: var(--steel); line-height: 1.6; }
+
+/* ── Portfolio Summary Cards ────────────────────── */
+.portfolio-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 12px; margin-bottom: 28px;
+}
+.portfolio-card {
+  border-radius: 16px; padding: 18px 16px; text-align: center;
+  border: 2px solid var(--border);
+}
+.portfolio-card .pf-emoji { font-size: 1.5rem; margin-bottom: 6px; }
+.portfolio-card .pf-label {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; margin-bottom: 4px;
+}
+.portfolio-card .pf-count {
+  font-family: 'DM Serif Display', serif; font-size: 1.8rem; line-height: 1;
+}
+.portfolio-card .pf-names {
+  font-size: 0.72rem; color: var(--steel); margin-top: 6px; line-height: 1.4;
+}
+
+/* ── Print ──────────────────────────────────────── */
+.print-only { display: none; }
+@media print {
+  body { background: white !important; color: black; }
+  @page { margin: 1.5cm; }
+  .app-header, .progress-bar-wrap, .no-print, #step1, #step2 { display: none !important; }
+  .print-only { display: block !important; }
+  #step3 { display: block !important; }
+  .card, .chart-wrap, .score-summary, .strategy-card, .portfolio-card {
+    box-shadow: none !important; border: 1px solid #ddd;
+  }
+  .card-header, .chart-topbar {
+    background: #1a3a6e !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .app-shell { padding: 0; max-width: 100%; }
+  canvas { max-width: 500px; margin: 0 auto; display: block; }
+  .strategy-item { break-inside: avoid; }
+  .score-summary { break-inside: avoid; }
+  .chart-wrap { break-inside: avoid; }
+  .strategy-grid { grid-template-columns: 1fr 1fr; }
+  .portfolio-grid { grid-template-columns: repeat(4, 1fr); }
+  .print-header {
+    text-align: center; padding: 20px 0 30px;
+    border-bottom: 3px solid #1a3a6e; margin-bottom: 24px;
+  }
+  .print-header h1 { font-size: 1.8rem; color: #1a3a6e; font-family: 'DM Serif Display', serif; }
+  .print-header p { color: #666; font-size: 0.9rem; margin-top: 6px; }
+}
+@media (max-width: 620px) {
+  .strategy-grid { grid-template-columns: 1fr; }
+  .portfolio-grid { grid-template-columns: 1fr 1fr; }
+  .threshold-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- App Header -->
+  <div class="app-header no-print">
+    <div class="eyebrow">Strategic Management Tool</div>
+    <h1>BCG Matrix <em>Growth-Share Analysis</em></h1>
+    <p>Plot your business units by market share and growth rate to guide portfolio investment decisions.</p>
+  </div>
+
+  <!-- Progress Bar -->
+  <div class="progress-bar-wrap no-print" id="progressBar">
+    <div class="progress-bar-fill" id="progressFill" style="width:16%"></div>
+    <div class="step-node active" id="node1">
+      <div class="bubble">1</div><span class="step-label">Company</span>
+    </div>
+    <div class="step-node" id="node2">
+      <div class="bubble">2</div><span class="step-label">Units</span>
+    </div>
+    <div class="step-node" id="node3">
+      <div class="bubble">3</div><span class="step-label">Results</span>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 1 ═══════════ -->
+  <div class="step active" id="step1">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">🏢</div>
+        <div>
+          <h2>Company Information</h2>
+          <p>Identify the organization being analyzed</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="companyName">Company Name *</label>
+          <input type="text" id="companyName" placeholder="e.g. Apple Inc." aria-label="Company Name">
+          <div class="error-msg" id="err-company">Please enter a company name to continue.</div>
+        </div>
+        <div class="form-group">
+          <label for="companyIndustry">Industry / Sector</label>
+          <input type="text" id="companyIndustry" placeholder="e.g. Consumer Electronics" aria-label="Industry or Sector">
+        </div>
+        <div class="form-group">
+          <label for="analystName">Analyst Name</label>
+          <input type="text" id="analystName" placeholder="e.g. Jane Smith" aria-label="Analyst Name">
+        </div>
+        <div class="form-group">
+          <label for="analysisDate">Date</label>
+          <input type="text" id="analysisDate" placeholder="" aria-label="Analysis Date">
+        </div>
+
+        <div class="hint-box">
+          <strong>How the BCG Matrix works:</strong><br>
+          You will enter your company's business units or product lines along with their <strong>Relative Market Share</strong> and <strong>Industry Growth Rate (%)</strong>. Each unit is plotted on a 2&times;2 matrix:<br>
+          &bull; <strong>Stars</strong> ⭐ &mdash; high share + high growth (invest to grow)<br>
+          &bull; <strong>Question Marks</strong> ❓ &mdash; low share + high growth (invest or divest)<br>
+          &bull; <strong>Cash Cows</strong> 🐄 &mdash; high share + low growth (harvest cash)<br>
+          &bull; <strong>Dogs</strong> 🐕 &mdash; low share + low growth (divest or reposition)
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnToStep2">Continue to Business Units &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 2 ═══════════ -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">📊</div>
+        <div>
+          <h2>Business Units</h2>
+          <p>Enter your products or divisions with market data</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="hint-box">
+          <strong>📘 How to use this tool:</strong><br>
+          &bull; <strong>Relative Market Share</strong> = your unit's market share divided by the largest competitor's share. A value &gt; 1.0 means you lead the market.<br>
+          &bull; <strong>Market Growth Rate (%)</strong> = the industry growth rate for that unit's market. Can be negative for declining markets.<br>
+          &bull; <strong>Revenue ($M)</strong> is optional &mdash; if provided, it sizes the bubble on the chart. Leave blank for equal-sized bubbles.<br>
+          &bull; Adjust the threshold dividers below to customize where the quadrant lines are drawn. Defaults: share = 1.0, growth = 10%.
+        </div>
+
+        <!-- Threshold Dividers -->
+        <div class="threshold-row">
+          <div class="threshold-group">
+            <label for="shareThreshold">Market Share Divider</label>
+            <input type="number" id="shareThreshold" value="1.0" step="0.1" min="0.1" aria-label="Market share threshold">
+            <div class="hint-text">&gt; this value = High share (left side). Default: 1.0</div>
+          </div>
+          <div class="threshold-group">
+            <label for="growthThreshold">Growth Rate Divider (%)</label>
+            <input type="number" id="growthThreshold" value="10" step="1" aria-label="Growth rate threshold">
+            <div class="hint-text">&gt; this value = High growth (top half). Default: 10%</div>
+          </div>
+        </div>
+
+        <!-- BU Table -->
+        <div class="bu-table-wrap">
+          <div class="bu-table-header">
+            <div class="dim-dot"></div>
+            <h3>Business Units / Product Lines</h3>
+          </div>
+          <div class="bu-table-body">
+            <div class="col-headers">
+              <span class="ch-num"></span>
+              <span class="ch-name">Unit Name</span>
+              <span class="ch-share">Rel. Share</span>
+              <span class="ch-growth">Growth %</span>
+              <span class="ch-rev">Revenue ($M)</span>
+              <span class="ch-del"></span>
+            </div>
+            <div id="buList"></div>
+            <div class="bu-footer">
+              <button class="add-btn" id="addBuBtn" onclick="addBuRow()">
+                <span style="font-size:1.1rem;line-height:1">+</span> Add Business Unit
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="form-error" style="display:none;"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="goToStep1()">&larr; Back</button>
+          <button class="btn btn-primary" onclick="generateResults()">Generate Results &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 3 ═══════════ -->
+  <div class="step" id="step3">
+    <!-- Print Header -->
+    <div class="print-only print-header">
+      <h1 id="print-title">BCG Growth-Share Matrix</h1>
+      <p id="print-meta"></p>
+    </div>
+
+    <!-- Portfolio Summary Cards -->
+    <div class="portfolio-grid" id="portfolioGrid"></div>
+
+    <!-- Score Summary Table -->
+    <div class="score-summary">
+      <table class="score-table">
+        <thead>
+          <tr>
+            <th>Business Unit</th>
+            <th>Rel. Market Share</th>
+            <th>Growth Rate %</th>
+            <th>Revenue</th>
+            <th>Quadrant</th>
+          </tr>
+        </thead>
+        <tbody id="scoreTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-wrap">
+      <div class="chart-topbar">
+        <div class="chart-topbar-left">
+          <div class="chart-icon">📊</div>
+          <h3>BCG Growth-Share Matrix</h3>
+        </div>
+      </div>
+      <canvas id="matrixCanvas" width="700" height="700"></canvas>
+    </div>
+
+    <!-- Strategy Cards (one per quadrant that has units) -->
+    <div id="strategyCards"></div>
+
+    <!-- Action Buttons -->
+    <div class="btn-row no-print">
+      <button class="btn btn-secondary" onclick="goToStep2()">&larr; Edit Units</button>
+      <button class="btn btn-secondary" onclick="resetAll()">↺ Start Over</button>
+      <button class="btn btn-accent" onclick="window.print()">🖨️ Print / Save PDF</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   BCG Growth-Share Matrix Tool — JavaScript
+   ═══════════════════════════════════════════════════════ */
+
+const MAX_BU = 10, MIN_BU = 2;
+
+const QUAD_CONFIG = {
+  Star:         { color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', emoji: '⭐', label: 'Star' },
+  QuestionMark: { color: '#7c3aed', bg: 'rgba(124,58,237,0.08)', emoji: '❓', label: 'Question Mark' },
+  CashCow:      { color: '#16a34a', bg: 'rgba(22,163,74,0.08)',  emoji: '🐄', label: 'Cash Cow' },
+  Dog:          { color: '#64748b', bg: 'rgba(100,116,139,0.08)',emoji: '🐕', label: 'Dog' }
+};
+
+let results = {};
+
+/* ── Set initial date ───────────────────────────── */
+(function() {
+  const now = new Date();
+  const months = ['January','February','March','April','May','June',
+    'July','August','September','October','November','December'];
+  document.getElementById('analysisDate').value =
+    months[now.getMonth()] + ' ' + now.getFullYear();
+})();
+
+/* ── Step Navigation ────────────────────────────── */
+function setStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  for (let i = 1; i <= 3; i++) {
+    const node = document.getElementById('node' + i);
+    node.classList.remove('active','done');
+    if (i < n) node.classList.add('done');
+    else if (i === n) node.classList.add('active');
+  }
+  const pct = n === 1 ? 16 : n === 2 ? 50 : 92;
+  document.getElementById('progressFill').style.width = pct + '%';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function goToStep1() { setStep(1); }
+function goToStep2() { setStep(2); }
+
+/* ── Step 1 Validation ──────────────────────────── */
+document.getElementById('btnToStep2').onclick = function() {
+  const name = document.getElementById('companyName').value.trim();
+  const err  = document.getElementById('err-company');
+  if (!name) {
+    document.getElementById('companyName').classList.add('error');
+    err.style.display = 'block';
+    return;
+  }
+  document.getElementById('companyName').classList.remove('error');
+  err.style.display = 'none';
+  setStep(2);
+};
+
+/* ── Build BU Rows ──────────────────────────────── */
+function buildBuTable() {
+  const list = document.getElementById('buList');
+  list.innerHTML = '';
+  for (let i = 0; i < 3; i++) addBuRow();
+}
+
+function addBuRow(nameText) {
+  const list = document.getElementById('buList');
+  if (list.querySelectorAll('.bu-row').length >= MAX_BU) return;
+
+  const row = document.createElement('div');
+  row.className = 'bu-row';
+
+  const num = document.createElement('span');
+  num.className = 'row-num';
+  num.textContent = list.querySelectorAll('.bu-row').length + 1;
+
+  const nameIn = document.createElement('input');
+  nameIn.type = 'text'; nameIn.className = 'name-input';
+  nameIn.placeholder = 'Business unit name...';
+  nameIn.value = nameText || ''; nameIn.maxLength = 40;
+  nameIn.setAttribute('aria-label', 'Business unit name');
+
+  const shareIn = document.createElement('input');
+  shareIn.type = 'number'; shareIn.className = 'data-input share-input';
+  shareIn.min = 0; shareIn.step = 0.01; shareIn.placeholder = 'e.g. 1.2';
+  shareIn.setAttribute('aria-label', 'Relative market share');
+
+  const growthIn = document.createElement('input');
+  growthIn.type = 'number'; growthIn.className = 'data-input growth-input';
+  growthIn.step = 0.1; growthIn.placeholder = 'e.g. 15';
+  growthIn.setAttribute('aria-label', 'Market growth rate percent');
+
+  const revIn = document.createElement('input');
+  revIn.type = 'number'; revIn.className = 'data-input rev-input';
+  revIn.min = 0; revIn.step = 1; revIn.placeholder = 'Optional';
+  revIn.setAttribute('aria-label', 'Revenue in millions');
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'remove-btn'; delBtn.title = 'Remove this unit';
+  delBtn.innerHTML = '✕';
+  delBtn.onclick = () => removeBuRow(row);
+
+  row.append(num, nameIn, shareIn, growthIn, revIn, delBtn);
+  list.appendChild(row);
+  updateBuNumbers();
+  updateAddBtn();
+  if (!nameText) nameIn.focus();
+}
+
+function removeBuRow(rowEl) {
+  const list = document.getElementById('buList');
+  if (list.querySelectorAll('.bu-row').length <= MIN_BU) return;
+  rowEl.style.cssText = 'opacity:0;transform:translateX(8px);transition:opacity 0.18s,transform 0.18s;';
+  setTimeout(() => { rowEl.remove(); updateBuNumbers(); updateAddBtn(); }, 190);
+}
+
+function updateBuNumbers() {
+  const rows = document.querySelectorAll('#buList .bu-row');
+  rows.forEach((r, i) => {
+    r.querySelector('.row-num').textContent = i + 1;
+    r.querySelector('.remove-btn').disabled = (rows.length <= MIN_BU);
+  });
+}
+
+function updateAddBtn() {
+  const btn = document.getElementById('addBuBtn');
+  if (btn) btn.disabled = document.getElementById('buList').querySelectorAll('.bu-row').length >= MAX_BU;
+}
+
+/* ── Classify Quadrant ──────────────────────────── */
+function classify(share, growth, shareTh, growthTh) {
+  if (growth > growthTh && share > shareTh)  return 'Star';
+  if (growth > growthTh && share <= shareTh) return 'QuestionMark';
+  if (growth <= growthTh && share > shareTh) return 'CashCow';
+  return 'Dog';
+}
+
+/* ── Generate Results ───────────────────────────── */
+function generateResults() {
+  const errBox = document.getElementById('form-error');
+  errBox.style.display = 'none';
+  const errors = [];
+
+  const shareTh = parseFloat(document.getElementById('shareThreshold').value);
+  const growthTh = parseFloat(document.getElementById('growthThreshold').value);
+  if (isNaN(shareTh) || shareTh <= 0) errors.push('Market share divider must be a positive number.');
+  if (isNaN(growthTh)) errors.push('Growth rate divider must be a number.');
+
+  // Collect BU data
+  const rows = document.querySelectorAll('#buList .bu-row');
+  const units = [];
+  rows.forEach((row, i) => {
+    const name = row.querySelector('.name-input').value.trim();
+    const share = parseFloat(row.querySelector('.share-input').value);
+    const growth = parseFloat(row.querySelector('.growth-input').value);
+    const rev = parseFloat(row.querySelector('.rev-input').value);
+    if (name && !isNaN(share) && !isNaN(growth)) {
+      if (share <= 0) {
+        errors.push(`"${name}": Relative market share must be > 0.`);
+      } else {
+        units.push({
+          name, share, growth,
+          revenue: isNaN(rev) ? null : rev,
+          quadrant: classify(share, growth, shareTh, growthTh)
+        });
+      }
+    }
+  });
+
+  if (units.length < 2) errors.push('Enter at least 2 complete business units (name, share, and growth rate).');
+
+  if (errors.length) {
+    errBox.innerHTML = errors.join('<br>');
+    errBox.style.display = 'block';
+    return;
+  }
+
+  results = {
+    company: document.getElementById('companyName').value.trim(),
+    industry: document.getElementById('companyIndustry').value.trim(),
+    analyst: document.getElementById('analystName').value.trim(),
+    date: document.getElementById('analysisDate').value.trim(),
+    units, shareTh, growthTh
+  };
+
+  buildPortfolioCards();
+  buildScoreTable();
+  drawMatrix();
+  buildStrategyCards();
+  updatePrintHeader();
+  setStep(3);
+}
+
+/* ── Portfolio Summary Cards ────────────────────── */
+function buildPortfolioCards() {
+  const grid = document.getElementById('portfolioGrid');
+  const r = results;
+  const quads = ['Star','QuestionMark','CashCow','Dog'];
+  grid.innerHTML = quads.map(q => {
+    const cfg = QUAD_CONFIG[q];
+    const matched = r.units.filter(u => u.quadrant === q);
+    return `
+      <div class="portfolio-card" style="background:${cfg.bg};border-color:${cfg.color}30;">
+        <div class="pf-emoji">${cfg.emoji}</div>
+        <div class="pf-label" style="color:${cfg.color}">${cfg.label}${matched.length !== 1 ? 's' : ''}</div>
+        <div class="pf-count" style="color:${cfg.color}">${matched.length}</div>
+        <div class="pf-names">${matched.map(u => u.name).join(', ') || '—'}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ── Score Table ────────────────────────────────── */
+function buildScoreTable() {
+  const tbody = document.getElementById('scoreTableBody');
+  tbody.innerHTML = results.units.map(u => {
+    const cfg = QUAD_CONFIG[u.quadrant];
+    return `
+      <tr>
+        <td><strong>${u.name}</strong></td>
+        <td>${u.share.toFixed(2)}</td>
+        <td>${u.growth.toFixed(1)}%</td>
+        <td>${u.revenue !== null ? '$' + u.revenue.toFixed(0) + 'M' : '—'}</td>
+        <td>
+          <span class="score-chip" style="background:${cfg.color}18;color:${cfg.color};">
+            ${cfg.emoji} ${cfg.label}
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+/* ── Draw BCG Matrix on Canvas ──────────────────── */
+function drawMatrix() {
+  const canvas = document.getElementById('matrixCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 700, H = 700;
+  const pad = { top: 60, right: 50, bottom: 70, left: 70 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+  const r = results;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Determine axis ranges from data + thresholds
+  const allShares = r.units.map(u => u.share);
+  const allGrowths = r.units.map(u => u.growth);
+  const minShare = 0;
+  const maxShare = Math.max(...allShares, r.shareTh * 1.5) * 1.15;
+  const minGrowth = Math.min(...allGrowths, 0) - 5;
+  const maxGrowth = Math.max(...allGrowths, r.growthTh * 1.5) + 5;
+
+  // Map data to canvas coordinates
+  // BCG convention: X axis is REVERSED (high share on LEFT)
+  function mapX(share) { return pad.left + cw - ((share - minShare) / (maxShare - minShare)) * cw; }
+  function mapY(growth) { return pad.top + ch - ((growth - minGrowth) / (maxGrowth - minGrowth)) * ch; }
+
+  const thX = mapX(r.shareTh);
+  const thY = mapY(r.growthTh);
+
+  // 1. Quadrant fills
+  // Top-left: Star (high share = left, high growth = top)
+  ctx.fillStyle = QUAD_CONFIG.Star.bg;
+  ctx.fillRect(pad.left, pad.top, thX - pad.left, thY - pad.top);
+  // Top-right: Question Mark
+  ctx.fillStyle = QUAD_CONFIG.QuestionMark.bg;
+  ctx.fillRect(thX, pad.top, pad.left + cw - thX, thY - pad.top);
+  // Bottom-left: Cash Cow
+  ctx.fillStyle = QUAD_CONFIG.CashCow.bg;
+  ctx.fillRect(pad.left, thY, thX - pad.left, pad.top + ch - thY);
+  // Bottom-right: Dog
+  ctx.fillStyle = QUAD_CONFIG.Dog.bg;
+  ctx.fillRect(thX, thY, pad.left + cw - thX, pad.top + ch - thY);
+
+  // 2. Quadrant labels
+  ctx.font = 'bold 13px DM Sans, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.globalAlpha = 0.55;
+  const qLabels = [
+    { text: '⭐ STARS',           x: (pad.left + thX) / 2,       y: (pad.top + thY) / 2,       color: QUAD_CONFIG.Star.color },
+    { text: '❓ QUESTION MARKS',  x: (thX + pad.left + cw) / 2,  y: (pad.top + thY) / 2,       color: QUAD_CONFIG.QuestionMark.color },
+    { text: '🐄 CASH COWS',      x: (pad.left + thX) / 2,       y: (thY + pad.top + ch) / 2,  color: QUAD_CONFIG.CashCow.color },
+    { text: '🐕 DOGS',            x: (thX + pad.left + cw) / 2,  y: (thY + pad.top + ch) / 2,  color: QUAD_CONFIG.Dog.color }
+  ];
+  qLabels.forEach(q => {
+    ctx.fillStyle = q.color;
+    ctx.fillText(q.text, q.x, q.y);
+  });
+  ctx.globalAlpha = 1;
+
+  // 3. Border / axis lines
+  ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2;
+  ctx.strokeRect(pad.left, pad.top, cw, ch);
+
+  // 4. Dashed threshold lines
+  ctx.setLineDash([8, 4]);
+  ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5;
+  // Vertical: share threshold
+  ctx.beginPath(); ctx.moveTo(thX, pad.top); ctx.lineTo(thX, pad.top + ch); ctx.stroke();
+  // Horizontal: growth threshold
+  ctx.beginPath(); ctx.moveTo(pad.left, thY); ctx.lineTo(pad.left + cw, thY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 5. Axis labels
+  ctx.fillStyle = '#1e293b'; ctx.font = 'bold 12px DM Sans, sans-serif';
+  ctx.textAlign = 'center';
+  // X axis (reversed)
+  ctx.fillText('← High Share                    Relative Market Share                    Low Share →', pad.left + cw / 2, H - 14);
+  // Y axis
+  ctx.save();
+  ctx.translate(16, pad.top + ch / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillText('← Low Growth          Market Growth Rate (%)          High Growth →', 0, 0);
+  ctx.restore();
+
+  // Threshold annotations
+  ctx.fillStyle = '#94a3b8'; ctx.font = '10px DM Sans, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(r.shareTh.toFixed(1), thX, pad.top + ch + 16);
+  ctx.textAlign = 'right';
+  ctx.fillText(r.growthTh.toFixed(0) + '%', pad.left - 8, thY + 4);
+
+  // Tick marks on X axis (share values — reversed)
+  ctx.fillStyle = '#64748b'; ctx.font = '10px DM Sans, sans-serif'; ctx.textAlign = 'center';
+  const shareStep = niceStep(maxShare - minShare, 6);
+  for (let v = 0; v <= maxShare; v += shareStep) {
+    const x = mapX(v);
+    if (x >= pad.left && x <= pad.left + cw) {
+      ctx.fillText(v.toFixed(1), x, pad.top + ch + 16);
+    }
+  }
+  // Tick marks on Y axis
+  ctx.textAlign = 'right';
+  const growthStep = niceStep(maxGrowth - minGrowth, 6);
+  for (let v = Math.ceil(minGrowth / growthStep) * growthStep; v <= maxGrowth; v += growthStep) {
+    const y = mapY(v);
+    if (y >= pad.top && y <= pad.top + ch) {
+      ctx.fillText(v.toFixed(0) + '%', pad.left - 8, y + 4);
+    }
+  }
+
+  // 6. Bubbles
+  const hasRevenue = r.units.some(u => u.revenue !== null && u.revenue > 0);
+  const maxRev = hasRevenue ? Math.max(...r.units.map(u => u.revenue || 0)) : 1;
+  const minBubble = 18, maxBubble = 55;
+
+  r.units.forEach(u => {
+    const bx = mapX(u.share);
+    const by = mapY(u.growth);
+    let radius;
+    if (hasRevenue && u.revenue !== null && u.revenue > 0) {
+      radius = minBubble + (Math.sqrt(u.revenue / maxRev)) * (maxBubble - minBubble);
+    } else {
+      radius = 28;
+    }
+    const cfg = QUAD_CONFIG[u.quadrant];
+    drawBubble(ctx, bx, by, radius, cfg.color, u.name, u.revenue !== null ? '$' + u.revenue.toFixed(0) + 'M' : '');
+  });
+}
+
+function drawBubble(ctx, x, y, radius, color, label, value) {
+  ctx.shadowColor = 'rgba(0,0,0,0.15)'; ctx.shadowBlur = 12;
+  ctx.fillStyle = color + 'cc';
+  ctx.beginPath(); ctx.arc(x, y, radius, 0, 2 * Math.PI); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+
+  if (radius > 20) {
+    ctx.fillStyle = 'white';
+    const fontSize = Math.min(13, radius / 3);
+    ctx.font = `bold ${fontSize}px DM Sans, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const shortLabel = label.length > 14 ? label.substring(0, 12) + '..' : label;
+    ctx.fillText(shortLabel, x, value ? y - fontSize / 2 : y);
+    if (value) {
+      ctx.font = `${Math.min(10, radius / 4)}px DM Sans, sans-serif`;
+      ctx.fillText(value, x, y + fontSize / 2 + 2);
+    }
+    ctx.textBaseline = 'alphabetic';
+  } else {
+    // Label outside for small bubbles
+    ctx.fillStyle = color;
+    ctx.font = 'bold 10px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x, y - radius - 6);
+  }
+}
+
+function niceStep(range, maxTicks) {
+  const rough = range / maxTicks;
+  const pow = Math.pow(10, Math.floor(Math.log10(rough)));
+  const norm = rough / pow;
+  let step;
+  if (norm <= 1.5) step = 1;
+  else if (norm <= 3) step = 2;
+  else if (norm <= 7) step = 5;
+  else step = 10;
+  return step * pow;
+}
+
+/* ── Strategy Cards ─────────────────────────────── */
+function buildStrategyCards() {
+  const container = document.getElementById('strategyCards');
+  const r = results;
+
+  const strategies = {
+    Star: {
+      emoji: '⭐', label: 'Stars', color: '#f59e0b',
+      tagline: units => `${r.company}'s star unit${units.length > 1 ? 's' : ''} (${units.map(u => u.name).join(', ')}) ${units.length > 1 ? 'operate' : 'operates'} in high-growth markets with strong market share — invest to maintain leadership.`,
+      items: [
+        { icon: '🏭', title: 'Increase Production Capacity', body: 'Scale operations to meet growing demand. Stars generate high returns but require significant reinvestment to maintain market position.' },
+        { icon: '📣', title: 'Aggressive Marketing', body: 'Invest heavily in marketing and brand building to defend and grow market share while the market is still expanding rapidly.' },
+        { icon: '🌍', title: 'Pursue Market Development', body: 'Expand into new geographies or customer segments. High growth markets reward companies that capture territory early.' },
+        { icon: '🛡️', title: 'Protect Share from Competitors', body: 'Monitor competitive threats closely and respond quickly. Losing share in a high-growth market is costly to recover.' },
+        { icon: '🔄', title: 'Prepare for Cash Cow Transition', body: 'As market growth slows, Stars become Cash Cows. Build infrastructure now for efficient cash generation when that transition occurs.' },
+        { icon: '💰', title: 'Reinvest Returns Strategically', body: 'Channel the strong returns these units generate into maintaining their competitive position and funding promising Question Marks.' }
+      ]
+    },
+    QuestionMark: {
+      emoji: '❓', label: 'Question Marks', color: '#7c3aed',
+      tagline: units => `${r.company}'s question mark${units.length > 1 ? 's' : ''} (${units.map(u => u.name).join(', ')}) ${units.length > 1 ? 'face' : 'faces'} high-growth markets but ${units.length > 1 ? 'lack' : 'lacks'} the market share to dominate — invest selectively or divest.`,
+      items: [
+        { icon: '🎯', title: 'Selective Investment', body: 'Invest aggressively only in the most promising Question Marks. Not all deserve resources — choose those with the clearest path to market leadership.' },
+        { icon: '📈', title: 'Market Penetration to Build Share', body: 'Focus on gaining market share through competitive pricing, superior service, or targeted marketing before the growth window closes.' },
+        { icon: '🤝', title: 'Joint Venture to Reduce Risk', body: 'Consider partnering with stronger players to share the investment burden. A joint venture can provide market access and reduce capital risk.' },
+        { icon: '📦', title: 'Divest if Share-Building Fails', body: 'If the unit cannot gain meaningful share despite investment, divest before it becomes a Dog. Redirect resources to better opportunities.' },
+        { icon: '🔍', title: 'Focus on Niche Segments', body: 'Instead of competing across the entire market, find a defensible niche where the unit can become a Star in a smaller segment.' },
+        { icon: '⏱️', title: 'Set Clear Investment Milestones', body: 'Define specific share-gain milestones with deadlines. If the unit fails to hit them, trigger the divestiture decision before resources are wasted.' }
+      ]
+    },
+    CashCow: {
+      emoji: '🐄', label: 'Cash Cows', color: '#16a34a',
+      tagline: units => `${r.company}'s cash cow${units.length > 1 ? 's' : ''} (${units.map(u => u.name).join(', ')}) ${units.length > 1 ? 'generate' : 'generates'} more cash than ${units.length > 1 ? 'they consume' : 'it consumes'} — harvest to fund Stars and Question Marks.`,
+      items: [
+        { icon: '🛡️', title: 'Maintain Market Position', body: 'Defend current market share efficiently without over-investing. Cash Cows fund the rest of the portfolio, so keep them healthy.' },
+        { icon: '💰', title: 'Harvest Excess Cash', body: 'Extract cash flow to fund Stars and promising Question Marks. Cash Cows are the financial engine of the portfolio.' },
+        { icon: '⚔️', title: 'Defend Against Attacks', body: 'Competitors may target your dominant position. Maintain just enough investment to repel competitive threats without overspending.' },
+        { icon: '⚙️', title: 'Minimize Reinvestment', body: 'Invest only what is necessary for maintenance and operational efficiency. Avoid chasing growth in a mature, low-growth market.' },
+        { icon: '📉', title: 'Plan for Controlled Decline', body: 'As the market matures further, plan a gradual reduction in investment. Extract maximum value while the unit remains profitable.' },
+        { icon: '🔄', title: 'Redeploy Resources Wisely', body: 'The cash generated here should flow to high-growth opportunities. Establish formal mechanisms to transfer funds to Stars and Question Marks.' }
+      ]
+    },
+    Dog: {
+      emoji: '🐕', label: 'Dogs', color: '#64748b',
+      tagline: units => `${r.company}'s dog${units.length > 1 ? 's' : ''} (${units.map(u => u.name).join(', ')}) ${units.length > 1 ? 'hold' : 'holds'} low share in low-growth markets — consider divestiture unless strategically essential.`,
+      items: [
+        { icon: '📦', title: 'Divest Non-Essential Units', body: 'If the unit does not serve a strategic purpose (such as completing a product line), sell or close it to free resources for better opportunities.' },
+        { icon: '💸', title: 'Liquidate Assets', body: 'If divestiture is not feasible, liquidate the unit\'s assets to recover whatever value remains. Redirect capital to higher-return units.' },
+        { icon: '🎯', title: 'Reposition into Niche', body: 'If the unit has unique capabilities, consider repositioning it into a profitable niche where its current strengths provide an advantage.' },
+        { icon: '🧹', title: 'Harvest Remaining Value', body: 'If the unit still generates some cash, extract what you can while minimizing new investment. Manage a controlled wind-down.' },
+        { icon: '✂️', title: 'Reduce Costs to Breakeven', body: 'Cut costs aggressively to reach breakeven. A Dog that breaks even without consuming resources may be worth keeping if it supports the portfolio.' },
+        { icon: '🔗', title: 'Evaluate Portfolio Fit', body: 'Some Dogs exist to support other units (e.g., product line completeness). Keep only if the strategic benefit clearly justifies the cost.' }
+      ]
+    }
+  };
+
+  const quadrantsPresent = [...new Set(r.units.map(u => u.quadrant))];
+  // Render in order: Star, QuestionMark, CashCow, Dog
+  const order = ['Star','QuestionMark','CashCow','Dog'];
+  container.innerHTML = order
+    .filter(q => quadrantsPresent.includes(q))
+    .map(q => {
+      const s = strategies[q];
+      const matched = r.units.filter(u => u.quadrant === q);
+      return `
+        <div class="strategy-card">
+          <div class="strategy-header">
+            <div class="icon-big">${s.emoji}</div>
+            <div>
+              <h3>${s.label} Strategy</h3>
+              <p>${s.tagline(matched)}</p>
+            </div>
+          </div>
+          <div class="strategy-grid">
+            ${s.items.map(item => `
+              <div class="strategy-item">
+                <h4 style="color:${s.color}">${item.icon} ${item.title}</h4>
+                <p>${item.body}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+}
+
+/* ── Print Header ───────────────────────────────── */
+function updatePrintHeader() {
+  document.getElementById('print-title').textContent =
+    'BCG Growth-Share Matrix — ' + results.company;
+  let meta = [];
+  if (results.industry) meta.push(results.industry);
+  if (results.analyst)  meta.push('Analyst: ' + results.analyst);
+  if (results.date)     meta.push(results.date);
+  document.getElementById('print-meta').textContent = meta.join('  |  ');
+}
+
+/* ── Reset All ──────────────────────────────────── */
+function resetAll() {
+  results = {};
+  ['companyName','companyIndustry','analystName','analysisDate']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('shareThreshold').value = '1.0';
+  document.getElementById('growthThreshold').value = '10';
+  buildBuTable();
+  setStep(1);
+}
+
+/* ── Initialize ─────────────────────────────────── */
+buildBuTable();
+</script>
+</body>
+</html>

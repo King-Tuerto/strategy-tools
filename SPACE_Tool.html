@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPACE Matrix Analysis Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens ──────────────────────────────── */
+:root {
+  --navy:   #0f2342;
+  --cobalt: #1a3a6e;
+  --sky:    #2563eb;
+  --steel:  #64748b;
+  --cloud:  #f1f5f9;
+  --white:  #ffffff;
+  --accent: #f59e0b;
+  --green:  #10b981;
+  --red:    #ef4444;
+  --orange: #f97316;
+  --text:   #1e293b;
+  --muted:  #94a3b8;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow:    0 4px 24px rgba(15,35,66,0.10);
+  --shadow-lg: 0 12px 48px rgba(15,35,66,0.16);
+}
+
+/* ── Reset & Base ───────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text);
+  background: var(--navy);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%,
+      rgba(37,99,235,0.25) 0%, transparent 60%),
+    repeating-linear-gradient(0deg,
+      transparent, transparent 39px,
+      rgba(255,255,255,0.02) 39px,
+      rgba(255,255,255,0.02) 40px),
+    repeating-linear-gradient(90deg,
+      transparent, transparent 39px,
+      rgba(255,255,255,0.02) 39px,
+      rgba(255,255,255,0.02) 40px);
+  min-height: 100vh;
+  line-height: 1.7;
+}
+
+/* ── App Shell ──────────────────────────────────── */
+.app-shell { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; }
+
+/* ── App Header ─────────────────────────────────── */
+.app-header { text-align: center; margin-bottom: 48px; }
+.app-header .eyebrow {
+  display: inline-block;
+  background: rgba(37,99,235,0.25);
+  color: #93c5fd;
+  font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 6px 16px; border-radius: 999px;
+  border: 1px solid rgba(147,197,253,0.25);
+  margin-bottom: 20px;
+}
+.app-header h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  color: var(--white); line-height: 1.1; margin-bottom: 14px;
+}
+.app-header h1 em { font-style: italic; color: #93c5fd; }
+.app-header p {
+  color: #94a3b8; font-size: 1.05rem;
+  max-width: 520px; margin: 0 auto;
+  line-height: 1.7; font-weight: 300;
+}
+
+/* ── Progress Bar ───────────────────────────────── */
+.progress-bar-wrap {
+  display: flex; align-items: center;
+  margin-bottom: 40px; position: relative;
+}
+.progress-bar-wrap::before {
+  content: ''; position: absolute;
+  top: 18px; left: 0; right: 0;
+  height: 2px; background: rgba(255,255,255,0.08); z-index: 0;
+}
+.progress-bar-fill {
+  position: absolute; top: 18px; left: 0;
+  height: 2px; background: var(--sky); z-index: 1;
+  transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+.step-node {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; position: relative; z-index: 2;
+}
+.step-node .bubble {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  border: 2px solid rgba(255,255,255,0.12);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; font-weight: 700;
+  color: var(--muted); transition: all 0.3s ease;
+}
+.step-node.active .bubble {
+  background: var(--sky); border-color: var(--sky);
+  color: white; box-shadow: 0 0 0 4px rgba(37,99,235,0.25);
+}
+.step-node.done .bubble {
+  background: var(--green); border-color: var(--green); color: white;
+}
+.step-node .step-label {
+  font-size: 0.7rem; font-weight: 600;
+  color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.08em; transition: color 0.3s;
+}
+.step-node.active .step-label { color: #93c5fd; }
+.step-node.done .step-label   { color: var(--green); }
+
+/* ── Card ───────────────────────────────────────── */
+.card {
+  background: var(--white); border-radius: 20px;
+  box-shadow: var(--shadow-lg); overflow: hidden;
+  animation: slideUp 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card-header {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%);
+  padding: 28px 36px; display: flex; align-items: center; gap: 16px;
+}
+.card-header h2 {
+  font-family: 'DM Serif Display', serif;
+  color: white; font-size: 1.5rem;
+}
+.card-header p {
+  color: #94a3b8; font-size: 0.85rem; margin-top: 4px; font-weight: 300;
+}
+.card-header .icon {
+  width: 48px; height: 48px;
+  background: rgba(255,255,255,0.1); border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; flex-shrink: 0;
+}
+.card-body { padding: 36px; }
+
+/* ── Step Visibility ────────────────────────────── */
+.step { display: none; }
+.step.active { display: block; }
+
+/* ── Form Inputs ────────────────────────────────── */
+.form-group { margin-bottom: 20px; }
+.form-group label {
+  display: block; font-size: 0.82rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--steel); margin-bottom: 8px;
+}
+input[type="text"],
+input[type="number"],
+textarea {
+  width: 100%; padding: 13px 16px;
+  border: 2px solid var(--border); border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif; font-size: 1rem;
+  color: var(--text); background: var(--cloud);
+  transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+}
+input:focus, textarea:focus {
+  border-color: var(--sky);
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.12);
+  background: white;
+}
+input.error {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
+}
+.error-msg {
+  font-size: 0.8rem; color: var(--red);
+  margin-top: 5px; font-weight: 500; display: none;
+}
+
+/* ── Buttons ────────────────────────────────────── */
+.btn {
+  padding: 13px 28px; border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif; font-size: 0.9rem;
+  font-weight: 700; cursor: pointer; border: 2px solid transparent;
+  transition: all 0.2s ease; display: inline-flex;
+  align-items: center; gap: 8px;
+}
+.btn-primary {
+  background: var(--sky); color: white;
+  box-shadow: 0 4px 16px rgba(37,99,235,0.30);
+}
+.btn-primary:hover {
+  background: #1d4ed8; transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(37,99,235,0.35);
+}
+.btn-secondary {
+  background: transparent; color: var(--steel);
+  border-color: var(--border);
+}
+.btn-secondary:hover { background: var(--cloud); color: var(--text); }
+.btn-accent {
+  background: var(--accent); color: white;
+  box-shadow: 0 4px 16px rgba(245,158,11,0.30);
+}
+.btn-accent:hover { background: #d97706; transform: translateY(-1px); }
+.btn-row {
+  display: flex; gap: 12px; justify-content: flex-end;
+  flex-wrap: wrap; margin-top: 28px;
+}
+
+/* ── Hint Box ───────────────────────────────────── */
+.hint-box {
+  background: #eff6ff; border: 1px solid #bfdbfe;
+  border-radius: 12px; padding: 18px 20px;
+  margin-bottom: 28px; font-size: 0.85rem;
+  color: #1e40af; line-height: 1.7;
+}
+
+/* ── Dimension Grid (4 boxes) ───────────────────── */
+.dimension-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 24px; margin-bottom: 28px;
+}
+.dimension-box {
+  border: 2px solid var(--border); border-radius: 16px;
+  overflow: hidden; transition: border-color 0.2s;
+}
+.dimension-box:focus-within { border-color: var(--sky); }
+.dim-header {
+  padding: 14px 18px; display: flex; align-items: center; gap: 10px;
+  border-bottom: 2px solid var(--border);
+}
+.dim-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.dim-header h3 {
+  font-size: 0.82rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em; color: var(--text);
+}
+.dim-header .dim-abbr {
+  margin-left: auto; font-size: 0.72rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 999px;
+}
+.dim-body { padding: 14px 18px; background: var(--cloud); }
+.factor-hint { font-size: 0.7rem; color: var(--muted); margin-bottom: 8px; }
+
+/* Column headers */
+.col-headers {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.col-headers span {
+  font-size: 0.68rem; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em;
+}
+.col-headers .ch-num   { width: 16px; flex-shrink: 0; }
+.col-headers .ch-label { flex: 1; }
+.col-headers .ch-score { width: 66px; text-align: center; flex-shrink: 0; }
+.col-headers .ch-del   { width: 26px; flex-shrink: 0; }
+
+/* Factor rows */
+.factor-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px; animation: rowIn 0.2s ease;
+}
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.factor-row .row-num {
+  font-size: 0.68rem; font-weight: 700;
+  color: var(--muted); width: 16px; text-align: right; flex-shrink: 0;
+}
+.factor-row .label-input {
+  flex: 1;
+  padding: 7px 10px !important; font-size: 0.82rem !important;
+  background: white !important;
+  border: 1.5px solid var(--border) !important;
+  border-radius: 8px !important;
+}
+.factor-row .label-input:focus {
+  border-color: var(--sky) !important;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.10) !important;
+}
+.factor-row .score-input {
+  width: 66px !important; text-align: center !important;
+  padding: 7px 8px !important; font-size: 0.88rem !important;
+  background: white !important;
+  border: 1.5px solid var(--border) !important;
+  border-radius: 8px !important; flex-shrink: 0;
+}
+.remove-btn {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: none; background: transparent;
+  color: var(--muted); cursor: pointer; font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s; flex-shrink: 0;
+}
+.remove-btn:hover { background: #fee2e2; color: var(--red); }
+.remove-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+
+/* Dim footer */
+.dim-footer {
+  display: flex; align-items: center;
+  justify-content: space-between; margin-top: 10px; gap: 10px;
+}
+.add-btn {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.78rem; font-weight: 700; color: var(--sky);
+  background: rgba(37,99,235,0.08);
+  border: 1.5px dashed rgba(37,99,235,0.3);
+  border-radius: 8px; padding: 6px 12px;
+  cursor: pointer; transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.add-btn:hover { background: rgba(37,99,235,0.15); border-color: var(--sky); }
+.add-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.avg-badge {
+  display: flex; align-items: center; justify-content: space-between;
+  background: white; border-radius: 8px;
+  padding: 8px 12px; border: 1px solid var(--border); flex: 1;
+}
+.avg-badge .avg-label {
+  font-size: 0.75rem; font-weight: 700;
+  color: var(--muted); text-transform: uppercase;
+}
+.avg-badge .avg-val { font-size: 1rem; font-weight: 700; }
+
+/* ── Form Error ─────────────────────────────────── */
+#form-error {
+  background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 8px; padding: 12px 16px;
+  margin-bottom: 20px; color: #dc2626;
+  font-size: 0.85rem; font-weight: 500;
+}
+
+/* ── Results — Score Summary Table ──────────────── */
+.score-summary {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow); overflow: hidden;
+  margin-bottom: 28px;
+}
+.score-table { width: 100%; border-collapse: collapse; }
+.score-table th {
+  background: var(--cloud); padding: 12px 20px;
+  text-align: left; font-size: 0.75rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--steel); border-bottom: 2px solid var(--border);
+}
+.score-table td {
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.score-table tr:last-child td { border-bottom: none; }
+.score-table .dim-name { font-weight: 700; }
+.score-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 52px; height: 28px; border-radius: 6px;
+  font-size: 0.85rem; font-weight: 700;
+}
+.coord-row { background: var(--navy); }
+.coord-row td {
+  border-bottom: none !important; padding: 16px 20px; color: white;
+}
+.coord-row .coord-pair {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.3rem; color: #93c5fd;
+}
+
+/* ── Chart Wrap ─────────────────────────────────── */
+.chart-wrap {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow); overflow: hidden;
+  margin-bottom: 28px;
+}
+.chart-topbar {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--cobalt) 100%);
+  padding: 18px 24px; display: flex; align-items: center; gap: 12px;
+}
+.chart-topbar h3 {
+  font-family: 'DM Serif Display', serif;
+  color: white; font-size: 1.15rem;
+}
+.chart-topbar .chart-icon {
+  width: 40px; height: 40px;
+  background: rgba(255,255,255,0.1); border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; flex-shrink: 0;
+}
+.chart-topbar .quadrant-badge {
+  padding: 6px 16px; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  margin-left: auto;
+}
+.chart-body { padding: 28px; text-align: center; }
+canvas#matrixCanvas {
+  display: block; width: 100%; max-width: 700px; margin: 0 auto;
+}
+
+/* ── Strategy Card ──────────────────────────────── */
+.strategy-card {
+  background: white; border-radius: 20px;
+  box-shadow: var(--shadow); overflow: hidden;
+  margin-bottom: 28px;
+}
+.strategy-header {
+  padding: 24px 28px 20px; border-bottom: 2px solid var(--border);
+  display: flex; align-items: flex-start; gap: 16px;
+}
+.strategy-header .icon-big { font-size: 2rem; line-height: 1; }
+.strategy-header h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.3rem; color: var(--text); margin-bottom: 4px;
+}
+.strategy-header p { color: var(--steel); font-size: 0.88rem; line-height: 1.6; }
+.strategy-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+}
+.strategy-item {
+  padding: 20px 24px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.strategy-item:hover { background: var(--cloud); }
+.strategy-item:nth-child(even) { border-right: none; }
+.strategy-item:nth-last-child(-n+2) { border-bottom: none; }
+.strategy-item h4 {
+  font-size: 0.88rem; font-weight: 700;
+  margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
+}
+.strategy-item p { font-size: 0.82rem; color: var(--steel); line-height: 1.6; }
+
+/* ── Print ──────────────────────────────────────── */
+.print-only { display: none; }
+
+@media print {
+  body { background: white !important; color: black; }
+  @page { margin: 1.5cm; }
+  .app-header, .progress-bar-wrap, .no-print, #step1, #step2 { display: none !important; }
+  .print-only { display: block !important; }
+  #step3 { display: block !important; }
+  .card, .chart-wrap, .score-summary, .strategy-card {
+    box-shadow: none !important; border: 1px solid #ddd;
+  }
+  .card-header, .chart-topbar {
+    background: #1a3a6e !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .app-shell { padding: 0; max-width: 100%; }
+  canvas { max-width: 500px; margin: 0 auto; display: block; }
+  .strategy-item { break-inside: avoid; }
+  .score-summary { break-inside: avoid; }
+  .chart-wrap { break-inside: avoid; }
+  .strategy-grid { grid-template-columns: 1fr 1fr; }
+  .print-header {
+    text-align: center; padding: 20px 0 30px;
+    border-bottom: 3px solid #1a3a6e; margin-bottom: 24px;
+  }
+  .print-header h1 {
+    font-size: 1.8rem; color: #1a3a6e;
+    font-family: 'DM Serif Display', serif;
+  }
+  .print-header p { color: #666; font-size: 0.9rem; margin-top: 6px; }
+}
+
+/* ── Responsive ─────────────────────────────────── */
+@media (max-width: 620px) {
+  .dimension-grid { grid-template-columns: 1fr; }
+  .strategy-grid { grid-template-columns: 1fr; }
+  .factor-row .label-input { min-width: 0; }
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- App Header -->
+  <div class="app-header no-print">
+    <div class="eyebrow">Strategic Management Tool</div>
+    <h1>SPACE <em>Matrix</em></h1>
+    <p>Plot your company's strategic position across four dimensions to identify the most appropriate strategic posture.</p>
+  </div>
+
+  <!-- Progress Bar -->
+  <div class="progress-bar-wrap no-print" id="progressBar">
+    <div class="progress-bar-fill" id="progressFill" style="width:16%"></div>
+    <div class="step-node active" id="node1">
+      <div class="bubble">1</div>
+      <span class="step-label">Company</span>
+    </div>
+    <div class="step-node" id="node2">
+      <div class="bubble">2</div>
+      <span class="step-label">Factors</span>
+    </div>
+    <div class="step-node" id="node3">
+      <div class="bubble">3</div>
+      <span class="step-label">Results</span>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 1 ═══════════ -->
+  <div class="step active" id="step1">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">🏢</div>
+        <div>
+          <h2>Company Information</h2>
+          <p>Identify the organization being analyzed</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="companyName">Company Name *</label>
+          <input type="text" id="companyName" placeholder="e.g. Apple Inc." aria-label="Company Name">
+          <div class="error-msg" id="err-company">Please enter a company name to continue.</div>
+        </div>
+        <div class="form-group">
+          <label for="companyIndustry">Industry / Sector</label>
+          <input type="text" id="companyIndustry" placeholder="e.g. Consumer Electronics" aria-label="Industry or Sector">
+        </div>
+        <div class="form-group">
+          <label for="analystName">Analyst Name</label>
+          <input type="text" id="analystName" placeholder="e.g. Jane Smith" aria-label="Analyst Name">
+        </div>
+        <div class="form-group">
+          <label for="analysisDate">Date</label>
+          <input type="text" id="analysisDate" placeholder="" aria-label="Analysis Date">
+        </div>
+
+        <div class="hint-box">
+          <strong>How the SPACE Matrix works:</strong><br>
+          The SPACE Matrix evaluates a company across four dimensions to determine its strategic posture:
+          <strong>Financial Strength (FS)</strong> and <strong>Industry Strength (IS)</strong> are scored on a positive scale (+1 to +6),
+          while <strong>Competitive Advantage (CA)</strong> and <strong>Environmental Stability (ES)</strong> use a negative scale (-1 to -6).
+          The dimension averages are combined to produce an (X, Y) coordinate plotted on a four-quadrant matrix:<br>
+          &bull; <strong>Aggressive</strong> (top-right) &mdash; strong internal and external position<br>
+          &bull; <strong>Competitive</strong> (bottom-right) &mdash; strong industry in an unstable environment<br>
+          &bull; <strong>Defensive</strong> (bottom-left) &mdash; weak position across dimensions<br>
+          &bull; <strong>Conservative</strong> (top-left) &mdash; financially strong but competitively weak
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnToStep2">Continue to Factors &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 2 ═══════════ -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">📊</div>
+        <div>
+          <h2>Factor Scores</h2>
+          <p>Rate factors across all four SPACE dimensions</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="hint-box">
+          <strong>📘 How to use this tool:</strong><br>
+          &bull; <strong>Financial Strength (FS)</strong> and <strong>Industry Strength (IS)</strong>: Score each factor from <strong>+1</strong> (worst) to <strong>+6</strong> (best).<br>
+          &bull; <strong>Competitive Advantage (CA)</strong> and <strong>Environmental Stability (ES)</strong>: Score each factor from <strong>-1</strong> (best) to <strong>-6</strong> (worst).<br>
+          &bull; Click any factor name to customize it. Use <strong>+ Add Factor</strong> to add rows (max 10) or <strong>&times;</strong> to remove them (min 1).<br>
+          &bull; The average for each dimension updates automatically as you enter scores.
+        </div>
+
+        <div class="dimension-grid" id="dimensionGrid"></div>
+
+        <div id="form-error" style="display:none;"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="goToStep1()">← Back</button>
+          <button class="btn btn-primary" onclick="generateResults()">Generate Results &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STEP 3 ═══════════ -->
+  <div class="step" id="step3">
+    <!-- Print Header -->
+    <div class="print-only print-header">
+      <h1 id="print-title">SPACE Matrix Analysis</h1>
+      <p id="print-meta"></p>
+    </div>
+
+    <!-- Score Summary Table -->
+    <div class="score-summary">
+      <table class="score-table">
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th>Factors &amp; Scores</th>
+            <th>Avg Score</th>
+          </tr>
+        </thead>
+        <tbody id="scoreTableBody"></tbody>
+        <tbody>
+          <tr class="coord-row">
+            <td colspan="2">
+              <strong>Strategic Vector Coordinates</strong>
+              <span style="font-size:0.78rem;color:#94a3b8;margin-left:12px;">
+                (X = CA + IS &nbsp;|&nbsp; Y = FS + ES)
+              </span>
+            </td>
+            <td><span class="coord-pair" id="coordDisplay">&mdash;</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-wrap">
+      <div class="chart-topbar">
+        <div class="chart-icon">📊</div>
+        <h3>SPACE Matrix</h3>
+        <span class="quadrant-badge" id="quadrantBadge"></span>
+      </div>
+      <div class="chart-body">
+        <canvas id="matrixCanvas" width="700" height="700"></canvas>
+      </div>
+    </div>
+
+    <!-- Strategy Card -->
+    <div class="strategy-card" id="strategyCard"></div>
+
+    <!-- Action Buttons -->
+    <div class="btn-row no-print">
+      <button class="btn btn-secondary" onclick="goToStep2()">← Edit Scores</button>
+      <button class="btn btn-secondary" onclick="resetAll()">↺ Start Over</button>
+      <button class="btn btn-accent" onclick="window.print()">🖨️ Print / Save PDF</button>
+    </div>
+  </div>
+
+</div><!-- /app-shell -->
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   SPACE Matrix Tool — JavaScript
+   ═══════════════════════════════════════════════════════ */
+
+const MAX_ROWS = 10, MIN_ROWS = 1;
+
+const DIMS = [
+  {
+    id: 'fs', abbr: 'FS', name: 'Financial Strength',
+    color: '#2563eb', headerBg: '#eff6ff', chipBg: '#dbeafe', chipColor: '#1d4ed8',
+    negative: false,
+    hint: 'Score +1 (worst) → +6 (best)',
+    placeholder: '1–6', min: 1, max: 6,
+    defaults: ['Return on Investment','Liquidity','Leverage','Cash Flow']
+  },
+  {
+    id: 'ca', abbr: 'CA', name: 'Competitive Advantage',
+    color: '#7c3aed', headerBg: '#f5f3ff', chipBg: '#ede9fe', chipColor: '#6d28d9',
+    negative: true,
+    hint: 'Score -1 (best) → -6 (worst)',
+    placeholder: '-1 to -6', min: -6, max: -1,
+    defaults: ['Market Share','Product Quality','Customer Loyalty','Technological Know-How']
+  },
+  {
+    id: 'is', abbr: 'IS', name: 'Industry Strength',
+    color: '#16a34a', headerBg: '#f0fdf4', chipBg: '#dcfce7', chipColor: '#15803d',
+    negative: false,
+    hint: 'Score +1 (worst) → +6 (best)',
+    placeholder: '1–6', min: 1, max: 6,
+    defaults: ['Growth Potential','Profit Potential','Financial Stability','Resource Utilization']
+  },
+  {
+    id: 'es', abbr: 'ES', name: 'Environmental Stability',
+    color: '#ea580c', headerBg: '#fff7ed', chipBg: '#ffedd5', chipColor: '#c2410c',
+    negative: true,
+    hint: 'Score -1 (best) → -6 (worst)',
+    placeholder: '-1 to -6', min: -6, max: -1,
+    defaults: ['Technological Changes','Rate of Inflation','Demand Variability','Competitive Pressure']
+  }
+];
+
+const quadrantConfig = {
+  Aggressive:   { color: '#16a34a', bg: 'rgba(22,163,74,0.12)',  emoji: '🚀' },
+  Competitive:  { color: '#2563eb', bg: 'rgba(37,99,235,0.12)',  emoji: '⚔️' },
+  Defensive:    { color: '#dc2626', bg: 'rgba(220,38,38,0.10)',  emoji: '🛡️' },
+  Conservative: { color: '#d97706', bg: 'rgba(245,158,11,0.10)', emoji: '🌱' }
+};
+
+let results = {};
+
+/* ── Set initial date ───────────────────────────── */
+(function() {
+  const now = new Date();
+  const months = ['January','February','March','April','May','June',
+    'July','August','September','October','November','December'];
+  document.getElementById('analysisDate').value =
+    months[now.getMonth()] + ' ' + now.getFullYear();
+})();
+
+/* ── Step Navigation ────────────────────────────── */
+function setStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  for (let i = 1; i <= 3; i++) {
+    const node = document.getElementById('node' + i);
+    node.classList.remove('active','done');
+    if (i < n)      node.classList.add('done');
+    else if (i === n) node.classList.add('active');
+  }
+  const pct = n === 1 ? 16 : n === 2 ? 50 : 92;
+  document.getElementById('progressFill').style.width = pct + '%';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function goToStep1() { setStep(1); }
+function goToStep2() { setStep(2); }
+
+/* ── Step 1 Validation ──────────────────────────── */
+document.getElementById('btnToStep2').onclick = function() {
+  const name = document.getElementById('companyName').value.trim();
+  const err  = document.getElementById('err-company');
+  if (!name) {
+    document.getElementById('companyName').classList.add('error');
+    err.style.display = 'block';
+    return;
+  }
+  document.getElementById('companyName').classList.remove('error');
+  err.style.display = 'none';
+  setStep(2);
+};
+
+/* ── Build Dimension Boxes ────────────────────────── */
+function buildDimensions() {
+  const grid = document.getElementById('dimensionGrid');
+  grid.innerHTML = '';
+  DIMS.forEach(d => {
+    const box = document.createElement('div');
+    box.className = 'dimension-box';
+    box.id = 'dim-box-' + d.id;
+    box.innerHTML = `
+      <div class="dim-header" style="background:${d.headerBg}">
+        <div class="dim-dot" style="background:${d.color}"></div>
+        <h3>${d.name}</h3>
+        <span class="dim-abbr" style="background:${d.chipBg};color:${d.chipColor}">${d.abbr}</span>
+      </div>
+      <div class="dim-body">
+        <p class="factor-hint">${d.hint}</p>
+        <div class="col-headers">
+          <span class="ch-num"></span>
+          <span class="ch-label">Factor Name <span style="font-weight:400;opacity:0.7">(click to edit)</span></span>
+          <span class="ch-score">Score</span>
+          <span class="ch-del"></span>
+        </div>
+        <div class="factor-list" id="factors-${d.id}"></div>
+        <div class="dim-footer">
+          <button class="add-btn" id="add-${d.id}" onclick="addRow('${d.id}')">
+            <span style="font-size:1.1rem;line-height:1">+</span> Add Factor
+          </button>
+          <div class="avg-badge">
+            <span class="avg-label">Avg ${d.abbr}</span>
+            <span class="avg-val" id="avg-${d.id}" style="color:${d.color}">—</span>
+          </div>
+        </div>
+      </div>`;
+    grid.appendChild(box);
+    d.defaults.forEach(label => addRow(d.id, label));
+  });
+}
+
+function addRow(dimId, labelText) {
+  const d = DIMS.find(x => x.id === dimId);
+  const list = document.getElementById('factors-' + dimId);
+  if (list.querySelectorAll('.factor-row').length >= MAX_ROWS) return;
+
+  const row = document.createElement('div');
+  row.className = 'factor-row';
+
+  const num = document.createElement('span');
+  num.className = 'row-num';
+  num.textContent = list.querySelectorAll('.factor-row').length + 1;
+
+  const labelIn = document.createElement('input');
+  labelIn.type = 'text';
+  labelIn.className = 'label-input';
+  labelIn.placeholder = 'Factor name…';
+  labelIn.value = labelText || '';
+  labelIn.maxLength = 50;
+  labelIn.setAttribute('aria-label', d.abbr + ' factor label');
+  labelIn.addEventListener('input', updateAvgs);
+
+  const scoreIn = document.createElement('input');
+  scoreIn.type = 'number';
+  scoreIn.className = 'score-input ' + dimId + '-input';
+  scoreIn.min = d.min; scoreIn.max = d.max; scoreIn.step = 0.5;
+  scoreIn.placeholder = d.placeholder;
+  scoreIn.setAttribute('aria-label', d.abbr + ' score');
+  scoreIn.addEventListener('input', updateAvgs);
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'remove-btn';
+  delBtn.title = 'Remove this factor';
+  delBtn.innerHTML = '✕';
+  delBtn.onclick = () => removeRow(dimId, row);
+
+  row.append(num, labelIn, scoreIn, delBtn);
+  list.appendChild(row);
+  updateRowNumbers(dimId);
+  updateAddBtn(dimId);
+  updateAvgs();
+  if (!labelText) labelIn.focus();
+}
+
+function removeRow(dimId, rowEl) {
+  const list = document.getElementById('factors-' + dimId);
+  if (list.querySelectorAll('.factor-row').length <= MIN_ROWS) return;
+  rowEl.style.cssText = 'opacity:0;transform:translateX(8px);transition:opacity 0.18s,transform 0.18s;';
+  setTimeout(() => {
+    rowEl.remove();
+    updateRowNumbers(dimId);
+    updateAddBtn(dimId);
+    updateAvgs();
+  }, 190);
+}
+
+function updateRowNumbers(dimId) {
+  const rows = document.querySelectorAll('#factors-' + dimId + ' .factor-row');
+  rows.forEach((r, i) => {
+    r.querySelector('.row-num').textContent = i + 1;
+    r.querySelector('.remove-btn').disabled = (rows.length <= MIN_ROWS);
+  });
+}
+
+function updateAddBtn(dimId) {
+  const btn = document.getElementById('add-' + dimId);
+  if (btn) btn.disabled =
+    document.getElementById('factors-' + dimId)
+      .querySelectorAll('.factor-row').length >= MAX_ROWS;
+}
+
+function updateAvgs() {
+  DIMS.forEach(d => {
+    const vals = [...document.querySelectorAll('.' + d.id + '-input')]
+      .map(i => parseFloat(i.value)).filter(v => !isNaN(v));
+    const el = document.getElementById('avg-' + d.id);
+    if (el) el.textContent = vals.length
+      ? (vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(2) : '—';
+  });
+}
+
+/* ── Collect Factor Data ────────────────────────── */
+function getFactorData(dimId) {
+  return [...document.querySelectorAll('#factors-' + dimId + ' .factor-row')]
+    .map((row, i) => ({
+      label: row.querySelector('.label-input').value.trim() || 'Factor ' + (i+1),
+      value: parseFloat(row.querySelector('.score-input').value)
+    }))
+    .filter(o => !isNaN(o.value));
+}
+
+/* ── Generate Results ───────────────────────────── */
+function generateResults() {
+  const errBox = document.getElementById('form-error');
+  errBox.style.display = 'none';
+  const errors = [];
+
+  // Validate each dimension has at least one scored factor
+  DIMS.forEach(d => {
+    const data = getFactorData(d.id);
+    if (data.length === 0) {
+      errors.push(d.name + ' (' + d.abbr + ') needs at least one scored factor.');
+    }
+    // Validate score ranges
+    data.forEach(f => {
+      if (f.value < d.min || f.value > d.max) {
+        errors.push(d.abbr + ' score for "' + f.label + '" must be between ' + d.min + ' and ' + d.max + '.');
+      }
+    });
+  });
+
+  if (errors.length) {
+    errBox.innerHTML = errors.join('<br>');
+    errBox.style.display = 'block';
+    return;
+  }
+
+  // Collect data
+  const fsData = getFactorData('fs');
+  const caData = getFactorData('ca');
+  const isData = getFactorData('is');
+  const esData = getFactorData('es');
+
+  const fsAvg = fsData.reduce((a,b) => a + b.value, 0) / fsData.length;
+  const caAvg = caData.reduce((a,b) => a + b.value, 0) / caData.length;
+  const isAvg = isData.reduce((a,b) => a + b.value, 0) / isData.length;
+  const esAvg = esData.reduce((a,b) => a + b.value, 0) / esData.length;
+
+  const xCoord = caAvg + isAvg;
+  const yCoord = fsAvg + esAvg;
+
+  // Determine quadrant
+  let quadrant;
+  if (xCoord >= 0 && yCoord >= 0) quadrant = 'Aggressive';
+  else if (xCoord >= 0 && yCoord < 0) quadrant = 'Competitive';
+  else if (xCoord < 0 && yCoord < 0) quadrant = 'Defensive';
+  else quadrant = 'Conservative';
+
+  results = {
+    company:  document.getElementById('companyName').value.trim(),
+    industry: document.getElementById('companyIndustry').value.trim(),
+    analyst:  document.getElementById('analystName').value.trim(),
+    date:     document.getElementById('analysisDate').value.trim(),
+    fsData, caData, isData, esData,
+    fsAvg: fsAvg.toFixed(2), caAvg: caAvg.toFixed(2),
+    isAvg: isAvg.toFixed(2), esAvg: esAvg.toFixed(2),
+    xCoord: parseFloat(xCoord.toFixed(2)),
+    yCoord: parseFloat(yCoord.toFixed(2)),
+    quadrant
+  };
+
+  buildScoreTable();
+  drawMatrix();
+  buildStrategyCard();
+  updatePrintHeader();
+  setStep(3);
+}
+
+/* ── Score Table ────────────────────────────────── */
+function buildScoreTable() {
+  const r = results;
+  const tbody = document.getElementById('scoreTableBody');
+
+  const dimRows = [
+    { name: 'Financial Strength',      abbr: 'FS', color: '#2563eb', data: r.fsData, avg: r.fsAvg },
+    { name: 'Competitive Advantage',   abbr: 'CA', color: '#7c3aed', data: r.caData, avg: r.caAvg },
+    { name: 'Industry Strength',       abbr: 'IS', color: '#16a34a', data: r.isData, avg: r.isAvg },
+    { name: 'Environmental Stability', abbr: 'ES', color: '#ea580c', data: r.esData, avg: r.esAvg }
+  ];
+
+  tbody.innerHTML = dimRows.map(d => `
+    <tr>
+      <td><span class="dim-name" style="color:${d.color}">${d.name} (${d.abbr})</span></td>
+      <td style="font-size:0.8rem;color:var(--steel);">
+        ${d.data.map(f => `${f.label}: <strong>${f.value}</strong>`).join(' &nbsp;|&nbsp; ')}
+      </td>
+      <td>
+        <span class="score-chip" style="background:${d.color}20;color:${d.color};">
+          ${d.avg}
+        </span>
+      </td>
+    </tr>
+  `).join('');
+
+  document.getElementById('coordDisplay').textContent =
+    `(${r.xCoord}, ${r.yCoord})`;
+}
+
+/* ── Canvas Chart — 4-Quadrant SPACE Matrix ────── */
+function drawMatrix() {
+  const canvas = document.getElementById('matrixCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 700, H = 700;
+  const cx = W / 2, cy = H / 2;
+  const scale = 50;
+  const maxR = 6;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#fafbfc';
+  ctx.fillRect(0, 0, W, H);
+
+  // 1. QUADRANT FILLS
+  const quadrants = [
+    { x: cx, y: 0,  w: cx, h: cy, color: 'rgba(22,163,74,0.08)',  label: 'AGGRESSIVE',   lx: cx + cx/2, ly: 36 },
+    { x: cx, y: cy, w: cx, h: cy, color: 'rgba(37,99,235,0.08)',  label: 'COMPETITIVE',  lx: cx + cx/2, ly: H - 16 },
+    { x: 0,  y: cy, w: cx, h: cy, color: 'rgba(220,38,38,0.08)',  label: 'DEFENSIVE',    lx: cx/2,      ly: H - 16 },
+    { x: 0,  y: 0,  w: cx, h: cy, color: 'rgba(217,119,6,0.08)',  label: 'CONSERVATIVE', lx: cx/2,      ly: 36 }
+  ];
+  const qColors = ['#16a34a', '#2563eb', '#dc2626', '#d97706'];
+
+  quadrants.forEach((q, i) => {
+    ctx.fillStyle = q.color;
+    ctx.fillRect(q.x, q.y, q.w, q.h);
+    ctx.font = 'bold 13px DM Sans, sans-serif';
+    ctx.fillStyle = qColors[i];
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = 0.65;
+    ctx.fillText(q.label, q.lx, q.ly);
+    ctx.globalAlpha = 1;
+  });
+
+  // 2. GRID LINES
+  ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+  ctx.lineWidth = 1;
+  for (let i = -maxR; i <= maxR; i++) {
+    ctx.beginPath();
+    ctx.moveTo(cx + i * scale, cy - maxR * scale);
+    ctx.lineTo(cx + i * scale, cy + maxR * scale);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - maxR * scale, cy + i * scale);
+    ctx.lineTo(cx + maxR * scale, cy + i * scale);
+    ctx.stroke();
+  }
+
+  // 3. AXES
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - maxR * scale - 10, cy);
+  ctx.lineTo(cx + maxR * scale + 10, cy);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + maxR * scale + 10);
+  ctx.lineTo(cx, cy - maxR * scale - 10);
+  ctx.stroke();
+
+  // 4. ARROWHEADS
+  function arrowhead(x, y, angle) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(-12, -6); ctx.lineTo(-12, 6);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  arrowhead(cx + maxR * scale + 10, cy, 0);
+  arrowhead(cx, cy - maxR * scale - 10, -Math.PI / 2);
+
+  // 5. TICK MARKS AND NUMBERS
+  ctx.fillStyle = '#64748b';
+  ctx.font = '11px DM Sans, sans-serif';
+  ctx.textAlign = 'center';
+  for (let i = -maxR; i <= maxR; i++) {
+    if (i === 0) continue;
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx + i * scale, cy - 5);
+    ctx.lineTo(cx + i * scale, cy + 5);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, cy + i * scale);
+    ctx.lineTo(cx + 5, cy + i * scale);
+    ctx.stroke();
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'center';
+    ctx.fillText(i, cx + i * scale, cy + 18);
+    ctx.textAlign = 'right';
+    ctx.fillText(-i, cx - 10, cy - i * scale + 4);
+    ctx.textAlign = 'center';
+  }
+
+  // 6. AXIS LABELS
+  ctx.fillStyle = '#1e293b';
+  ctx.font = 'bold 12px DM Sans, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('← CA + IS (Competitive Advantage + Industry Strength) →', cx, H - 8);
+  ctx.save();
+  ctx.translate(16, cy);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('← FS + ES (Financial Strength + Environmental Stability) →', 0, 0);
+  ctx.restore();
+
+  // 7. STRATEGIC VECTOR
+  const r = results;
+  const vx = cx + r.xCoord * scale;
+  const vy = cy - r.yCoord * scale;
+  const qc = quadrantConfig[r.quadrant];
+
+  // Vector line shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.15)';
+  ctx.shadowBlur = 8;
+  ctx.strokeStyle = qc.color + 'aa';
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(vx, vy); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Vector line
+  ctx.strokeStyle = qc.color;
+  ctx.lineWidth = 3.5;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(vx, vy); ctx.stroke();
+
+  // Arrowhead on vector
+  if (r.xCoord !== 0 || r.yCoord !== 0) {
+    const angle = Math.atan2(-(vy - cy), vx - cx);
+    ctx.save(); ctx.translate(vx, vy); ctx.rotate(angle);
+    ctx.fillStyle = qc.color;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-18, -9); ctx.lineTo(-18, 9);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+
+  // Origin dot
+  ctx.fillStyle = '#94a3b8';
+  ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 2 * Math.PI); ctx.fill();
+
+  // End point (bullseye)
+  ctx.fillStyle = qc.color;
+  ctx.beginPath(); ctx.arc(vx, vy, 9, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(vx, vy, 5, 0, 2 * Math.PI); ctx.fill();
+
+  // Coordinate label with background pill
+  const lbl = `(${r.xCoord}, ${r.yCoord})`;
+  const labelOffX = r.xCoord >= 0 ? 14 : -14;
+  const labelOffY = r.yCoord >= 0 ? -18 : 22;
+  ctx.font = 'bold 13px DM Sans, sans-serif';
+  const tw = ctx.measureText(lbl).width;
+  const lbx = vx + labelOffX - (r.xCoord >= 0 ? 0 : tw);
+  const lby = vy + labelOffY - 13;
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(lbx - 6, lby, tw + 12, 20, 4);
+  else ctx.rect(lbx - 6, lby, tw + 12, 20);
+  ctx.fill();
+  ctx.strokeStyle = qc.color + '60';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = qc.color;
+  ctx.textAlign = 'left';
+  ctx.fillText(lbl, lbx, lby + 14);
+
+  // Update badge
+  const badge = document.getElementById('quadrantBadge');
+  badge.textContent = r.quadrant;
+  badge.style.background = qc.bg;
+  badge.style.color = qc.color;
+}
+
+/* ── Strategy Card ──────────────────────────────── */
+function buildStrategyCard() {
+  const sc = document.getElementById('strategyCard');
+  const r = results;
+  const qc = quadrantConfig[r.quadrant];
+  let emoji, label, color, tagline, items;
+
+  if (r.quadrant === 'Aggressive') {
+    emoji = '🚀'; label = 'Aggressive'; color = '#16a34a';
+    tagline = `${r.company} is in the Aggressive quadrant with coordinates (${r.xCoord}, ${r.yCoord}), indicating a strong financial and competitive position in a favorable industry environment. This is an excellent strategic position from which to pursue growth-oriented strategies.`;
+    items = [
+      { icon: '📈', title: 'Market Penetration', body: 'Aggressively expand market share within existing markets. Your strong financial and competitive position provides the resources to outspend and outperform competitors.' },
+      { icon: '💡', title: 'Product Development', body: 'Invest in new products and services to capitalize on your industry position. Strong financials enable R&D investment to maintain your competitive edge.' },
+      { icon: '🌍', title: 'Market Development', body: 'Enter new geographic markets or customer segments. Your competitive advantage and financial stability reduce the risks of expansion into unfamiliar territory.' },
+      { icon: '🔗', title: 'Vertical Integration', body: 'Gain control of your supply chain through forward or backward integration. Your strong position allows you to capture more value and reduce dependency on external partners.' },
+      { icon: '🤝', title: 'Strategic Alliances', body: 'Form partnerships to accelerate growth and access new capabilities. From a position of strength, alliances can be structured on favorable terms.' },
+      { icon: '🎯', title: 'Competitive Advantage Building', body: 'Invest in differentiators that widen the gap between you and competitors. Build barriers to entry through technology, brand equity, or operational excellence.' }
+    ];
+  } else if (r.quadrant === 'Competitive') {
+    emoji = '⚔️'; label = 'Competitive'; color = '#2563eb';
+    tagline = `${r.company} is in the Competitive quadrant with coordinates (${r.xCoord}, ${r.yCoord}), reflecting a strong industry position but environmental instability or financial challenges. The strategy should focus on leveraging competitive strengths while addressing vulnerabilities.`;
+    items = [
+      { icon: '💰', title: 'Competitive Pricing', body: 'Use strategic pricing to defend and grow market share in an unstable environment. Price leadership can deter new entrants and pressure weaker competitors.' },
+      { icon: '🎯', title: 'Focus on Core Strengths', body: 'Double down on what you do best. In a turbulent environment, companies that concentrate on core competencies outperform those that spread resources thin.' },
+      { icon: '📊', title: 'Financial Restructuring', body: 'Strengthen your balance sheet to better weather environmental instability. Reduce debt, improve cash reserves, and optimize working capital management.' },
+      { icon: '🔧', title: 'Technology Investment', body: 'Invest in technology to improve efficiency and reduce vulnerability to environmental disruptions. Automation and digital transformation can offset instability.' },
+      { icon: '🔍', title: 'Niche Market Focus', body: 'Identify and dominate profitable niches where your competitive advantages are most defensible. Niche dominance provides shelter from broader market volatility.' },
+      { icon: '🤝', title: 'Joint Ventures', body: 'Share risk through joint ventures with partners who complement your strengths. Collaborative strategies reduce exposure while maintaining growth potential.' }
+    ];
+  } else if (r.quadrant === 'Defensive') {
+    emoji = '🛡️'; label = 'Defensive'; color = '#dc2626';
+    tagline = `${r.company} is in the Defensive quadrant with coordinates (${r.xCoord}, ${r.yCoord}), signaling weakness across all four dimensions. Immediate corrective action is needed to stabilize the business and develop a path toward recovery.`;
+    items = [
+      { icon: '✂️', title: 'Cost Reduction', body: 'Aggressively cut non-essential costs to preserve cash and improve margins. Focus spending only on activities that directly support survival and core operations.' },
+      { icon: '💰', title: 'Divestiture', body: 'Sell underperforming business units or non-core assets to generate cash and refocus resources on areas with the best chance of recovery.' },
+      { icon: '📉', title: 'Retrenchment', body: 'Scale back operations to a defensible core. Reduce product lines, exit unprofitable markets, and concentrate on segments where you can still compete.' },
+      { icon: '🤝', title: 'Merger / Acquisition', body: 'Seek a merger partner or acquirer that can provide the resources, capabilities, or market access needed to turn the business around.' },
+      { icon: '🔍', title: 'Focus Strategy', body: 'Concentrate all resources on the narrowest viable market segment where you have some remaining competitive advantage. Depth beats breadth in a defensive position.' },
+      { icon: '📋', title: 'Restructuring Plan', body: 'Develop a comprehensive restructuring plan with clear milestones, cost targets, and accountability. Communicate transparently with stakeholders about the turnaround timeline.' }
+    ];
+  } else {
+    // Conservative
+    emoji = '🌱'; label = 'Conservative'; color = '#d97706';
+    tagline = `${r.company} is in the Conservative quadrant with coordinates (${r.xCoord}, ${r.yCoord}), indicating financial strength but weak competitive positioning. The priority is to cautiously leverage financial resources to strengthen competitive standing without overextending.`;
+    items = [
+      { icon: '📈', title: 'Cautious Market Penetration', body: 'Gradually increase market share through targeted initiatives. Financial strength allows sustained investment, but weak competitive position requires a measured approach.' },
+      { icon: '💡', title: 'Product Development', body: 'Invest in improving existing products or developing new ones that address competitive weaknesses. Use your financial resources to close the gap with stronger competitors.' },
+      { icon: '🎲', title: 'Diversification', body: 'Explore related diversification opportunities that leverage your financial strength to enter markets where competitive barriers are lower.' },
+      { icon: '🔧', title: 'Process Improvement', body: 'Invest in operational excellence to reduce costs and improve quality. Financial strength enables continuous improvement programs that build long-term competitiveness.' },
+      { icon: '💰', title: 'Cash Preservation', body: 'Maintain conservative financial management to preserve your key advantage. Avoid overinvestment in areas where competitive returns are uncertain.' },
+      { icon: '🌐', title: 'Selective Expansion', body: 'Carefully select expansion opportunities where your financial resources give you a meaningful advantage over competitors and where risks are well understood.' }
+    ];
+  }
+
+  sc.innerHTML = `
+    <div class="strategy-header">
+      <div class="icon-big">${emoji}</div>
+      <div>
+        <h3>Strategic Position: ${label}</h3>
+        <p>${tagline}</p>
+      </div>
+    </div>
+    <div class="strategy-grid">
+      ${items.map(s => `
+        <div class="strategy-item">
+          <h4 style="color:${color}">${s.icon} ${s.title}</h4>
+          <p>${s.body}</p>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+/* ── Print Header ───────────────────────────────── */
+function updatePrintHeader() {
+  document.getElementById('print-title').textContent =
+    'SPACE Matrix Analysis — ' + results.company;
+  let meta = [];
+  if (results.industry) meta.push(results.industry);
+  if (results.analyst)  meta.push('Analyst: ' + results.analyst);
+  if (results.date)     meta.push(results.date);
+  document.getElementById('print-meta').textContent = meta.join('  |  ');
+}
+
+/* ── Reset All ──────────────────────────────────── */
+function resetAll() {
+  results = {};
+  ['companyName','companyIndustry','analystName','analysisDate']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  buildDimensions();
+  setStep(1);
+}
+
+/* ── Initialize ─────────────────────────────────── */
+buildDimensions();
+</script>
+</body>
+</html>
