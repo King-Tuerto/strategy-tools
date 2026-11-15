@@ -14,16 +14,29 @@
   h2 { font-family:"DM Serif Display",Georgia,serif; font-weight:400; font-size:1.45rem; margin:40px 0 4px; }
   p.lead { color:var(--muted); margin:0 0 24px; max-width:64ch; }
   p.sub { color:var(--muted); margin:0 0 16px; max-width:64ch; }
-  a.hero { display:block; background:var(--accent); color:var(--accent-ink); text-decoration:none; border-radius:12px; padding:24px; }
-  a.hero strong { display:block; font-family:"DM Serif Display",Georgia,serif; font-weight:400; font-size:1.6rem; }
-  a.hero span { display:block; opacity:.9; margin-top:4px; }
+
+  .hero { background:var(--accent); color:var(--accent-ink); border-radius:12px; padding:24px; }
+  .hero strong { display:block; font-family:"DM Serif Display",Georgia,serif; font-weight:400; font-size:1.6rem; }
+  .hero span { display:block; opacity:.9; margin-top:4px; }
+  .hero .actions { margin-top:16px; }
+  .hero .actions a { border:1px solid var(--accent-ink); color:var(--accent-ink); }
+  .hero .actions a.open { background:var(--accent-ink); color:var(--accent); }
+
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; }
-  a.card { display:block; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; text-decoration:none; color:var(--ink); }
-  a.card strong { display:block; font-size:1.05rem; color:var(--accent); }
-  a.card span { display:block; color:var(--muted); font-size:.9rem; }
-  a.hero:hover, a.hero:focus { filter:brightness(1.12); }
-  a.card:hover, a.card:focus { border-color:var(--accent); }
+  .card { display:flex; flex-direction:column; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  .card strong { display:block; font-size:1.05rem; color:var(--accent); }
+  .card span { display:block; color:var(--muted); font-size:.9rem; flex:1; }
+  .card .actions { margin-top:12px; }
+  .card .actions a { border:1px solid var(--accent); color:var(--accent); }
+  .card .actions a.open { background:var(--accent); color:var(--accent-ink); }
+
+  .actions { display:flex; flex-wrap:wrap; gap:8px; }
+  .actions a { display:inline-block; padding:6px 14px; border-radius:8px; text-decoration:none; font-weight:500; font-size:.92rem; }
+  .actions a:hover, .actions a:focus { filter:brightness(1.15); text-decoration:underline; }
+
   .note { margin-top:40px; padding:16px; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--muted); font-size:.95rem; }
+  .note p { margin:0 0 10px; }
+  .note p:last-child { margin-bottom:0; }
   .note strong { color:var(--ink); }
 </style>
 </head>
@@ -32,30 +45,47 @@
   <h1>Strategy Tools</h1>
   <p class="lead">Free tools for strategic management coursework. They run in your browser. Nothing to install and no login.</p>
 
-  <a class="hero" href="toolkit.html">
+  <div class="hero">
     <strong>Strategy Toolkit</strong>
     <span>All 14 tools in one place, linked together. Start here.</span>
-  </a>
+    <div class="actions">
+      <a class="open" href="toolkit.html">Open</a>
+      <a href="toolkit.html" download="Strategy Toolkit.html">Download</a>
+    </div>
+  </div>
 
   <h2>Individual tools</h2>
   <p class="sub">The same tools, one at a time. These do not share data with each other.</p>
   <div class="grid">
-    <a class="card" href="IFE_Tool.html"><strong>IFE</strong><span>Internal Factor Evaluation Matrix</span></a>
-    <a class="card" href="EFE_Tool.html"><strong>EFE</strong><span>External Factor Evaluation Matrix</span></a>
-    <a class="card" href="CPM_Tool.html"><strong>CPM</strong><span>Competitive Profile Matrix</span></a>
-    <a class="card" href="SWOT_Tool.html"><strong>SWOT</strong><span>Strengths, Weaknesses, Opportunities, Threats</span></a>
-    <a class="card" href="TOWS_Tool.html"><strong>TOWS</strong><span>TOWS Strategy Matrix</span></a>
-    <a class="card" href="SPACE_Tool.html"><strong>SPACE</strong><span>Strategic Position and Action Evaluation</span></a>
-    <a class="card" href="BCG_Tool.html"><strong>BCG</strong><span>Boston Consulting Group Matrix</span></a>
-    <a class="card" href="IE_Tool.html"><strong>IE</strong><span>Internal-External Matrix</span></a>
-    <a class="card" href="GRAND_Tool.html"><strong>Grand Strategy</strong><span>Grand Strategy Matrix</span></a>
-    <a class="card" href="PERCEPTUAL_Tool.html"><strong>Perceptual Map</strong><span>Competitor positioning map</span></a>
-    <a class="card" href="QSPM_Tool.html"><strong>QSPM</strong><span>Quantitative Strategic Planning Matrix</span></a>
-    <a class="card" href="RATIOS_Tool.html"><strong>Financial Ratios</strong><span>14 ratios, historical and projected years</span></a>
+    <div class="card"><strong>IFE</strong><span>Internal Factor Evaluation Matrix</span>
+      <div class="actions"><a class="open" href="IFE_Tool.html">Open</a><a href="IFE_Tool.html" download>Download</a></div></div>
+    <div class="card"><strong>EFE</strong><span>External Factor Evaluation Matrix</span>
+      <div class="actions"><a class="open" href="EFE_Tool.html">Open</a><a href="EFE_Tool.html" download>Download</a></div></div>
+    <div class="card"><strong>CPM</strong><span>Competitive Profile Matrix</span>
+      <div class="actions"><a class="open" href="CPM_Tool.html">Open</a><a href="CPM_Tool.html" download>Download</a></div></div>
+    <div class="card"><strong>SWOT</strong><span>Strengths, Weaknesses, Opportunities, Threats</span>
+      <div class="actions"><a class="open" href="SWOT_Tool.html">Open</a><a href="SWOT_Tool.html" download>Download</a></div></div>
+    <div class="card"><strong>TOWS</strong><span>TOWS Strategy Matrix</span>
+      <div class="actions"><a class="open" href="TOWS_Tool.html">Open</a><a href="TOWS_Tool.html" download>Download</a></div></div>
+    <div class="card"><strong>SPACE</strong><span>Strategic Position and Action Evaluation</span>
+      <div class="actions"><a class="open" href="SPACE_Tool.html">Open</a><a href="SPACE_Tool.html" download>Download</a></div></div>
+    <div class="card"><strong>BCG</strong><span>Boston Consulting Group Matrix</span>
+      <div class="actions"><a class="open" href="BCG_Tool.html">Open</a><a href="BCG_Tool.html" download>Download</a></div></div>
+    <div class="card"><strong>IE</strong><span>Internal-External Matrix</span>
+      <div class="actions"><a class="open" href="IE_Tool.html">Open</a><a href="IE_Tool.html" download>Download</a></div></div>
+    <div class="card"><strong>Grand Strategy</strong><span>Grand Strategy Matrix</span>
+      <div class="actions"><a class="open" href="GRAND_Tool.html">Open</a><a href="GRAND_Tool.html" download>Download</a></div></div>
+    <div class="card"><strong>Perceptual Map</strong><span>Competitor positioning map</span>
+      <div class="actions"><a class="open" href="PERCEPTUAL_Tool.html">Open</a><a href="PERCEPTUAL_Tool.html" download>Download</a></div></div>
+    <div class="card"><strong>QSPM</strong><span>Quantitative Strategic Planning Matrix</span>
+      <div class="actions"><a class="open" href="QSPM_Tool.html">Open</a><a href="QSPM_Tool.html" download>Download</a></div></div>
+    <div class="card"><strong>Financial Ratios</strong><span>14 ratios, historical and projected years</span>
+      <div class="actions"><a class="open" href="RATIOS_Tool.html">Open</a><a href="RATIOS_Tool.html" download>Download</a></div></div>
   </div>
 
   <div class="note">
-    <strong>Your work stays on your computer.</strong> Nothing you type is sent to this website or to your instructor. The Strategy Toolkit remembers your work in the browser you used, on that computer only. The individual tools do not save: finish in one sitting and use Print / Save PDF before you close the page.
+    <p><strong>Your work stays on your computer.</strong> Nothing you type is sent to this website or to your instructor. The Strategy Toolkit remembers your work in the browser you used, on that computer only. The individual tools do not save: finish in one sitting and use Print / Save PDF before you close the page.</p>
+    <p><strong>Downloading.</strong> Download puts the tool in your Downloads folder. Double-click the file to open it; it works without the internet. A downloaded copy does not see work you did on this website. In the Toolkit, use Save to file and Open file to move a project between them.</p>
   </div>
 </main>
 </body>
